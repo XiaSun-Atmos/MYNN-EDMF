@@ -9,6 +9,7 @@
  module module_bl_mynnedmf_driver
 
  use module_bl_mynnedmf_common
+ use netcdf
 
  contains
 
@@ -68,8 +69,11 @@
 !> \section arg_table_mynnedmf_driver Argument Table
 !! \htmlinclude mynnedmf_driver.html
 !!
+
+
  SUBROUTINE mynnedmf_driver           &
-                 (ids               , ide               , jds                , jde                , &
+                 (itimestep,xlat_u,xlong_u,&
+                  ids               , ide               , jds                , jde                , &
                   kds               , kde               , ims                , ime                , &
                   jms               , jme               , kms                , kme                , &
                   its               , ite               , jts                , jte                , &
@@ -115,6 +119,7 @@
 
 
  use module_bl_mynnedmf, only: mynnedmf
+ use module_write_nc
 
 !------------------------------------------------------------------- 
  implicit none
@@ -177,12 +182,17 @@
 
 !MYNN-1D
  REAL(kind_phys),    intent(in) :: delt, dxc
+INTEGER, INTENT(IN )::   itimestep
  LOGICAL, intent(in) :: restart
- INTEGER :: i, j, k, itf, jtf, n
+ INTEGER :: i, j, k, itf, jtf, n 
  INTEGER, intent(in) :: initflag,                      &
             IDS,IDE,JDS,JDE,KDS,KDE,                   &
             IMS,IME,JMS,JME,KMS,KME,                   &
             ITS,ITE,JTS,JTE,KTS,KTE
+
+
+ REAL, DIMENSION( ims:ime, jms:jme ), &
+         INTENT(IN), OPTIONAL    :: xlat_u,xlong_u
 
 !MYNN-3D
  real(kind_phys), dimension(ims:ime,kms:kme,jms:jme), intent(in) ::               &
@@ -270,11 +280,13 @@
  character :: errmsg   ! output error message (-).
  integer   :: errflg   ! output error flag (-).
 
- if (debug) then
-    write(0,*)"=============================================="
-    write(0,*)"in mynn wrapper..."
-    write(0,*)"initflag=",initflag," restart =",restart
- endif
+! write(*,*) "Xia in mynnedmf_driver"
+!  if (debug) then
+!     write(*,*)"=============================================="
+!     write(*,*)"in mynn wrapper..."
+!     write(*,*)"initflag=",initflag," restart =",restart
+!  endif
+
 
  errmsg = " "
  errflg = 0
@@ -346,11 +358,33 @@
  dqnbca1          =0.0
  dozone1          =0.0
 
+
  !---------------------------------------
  !Begin looping in the i- and j-direction
  !---------------------------------------
+ ! print*,'itimestep',itimestep
  do j = jts, jte !jtf
    do i = its, ite !itf
+      !print *, 'xlat_u',xlat_u(i,j),'xlong_u',xlong_u(i,j)
+      ! print*,'itimestep',itimestep
+
+         ! Initialize file once (first timestep only)
+      IF (xlat_u(i,j) < 37.46 .AND. xlat_u(i,j)> 37.45 .AND. xlong_u(i,j) < -79.28 .AND. xlong_u(i,j) > -79.29 &
+            .AND. itimestep == 1) THEN 
+            print*,"calling init_pbl_netcdf"  
+          CALL init_pbl_netcdf("/lfs5/BMC/rtwbl/Xia.Sun/mynn_dev/WRFV4.5.1_WFIP3_exp10_ci/run/pbl_diagnostics.nc", 1, 1, kde-kds+1, 1000)
+      ELSE IF (xlat_u(i,j) < 37.46 .AND. xlat_u(i,j)> 37.45 .AND. xlong_u(i,j) < -79.28 .AND. xlong_u(i,j) > -79.29 &
+            .AND. mod(itimestep, 100) == 0 ) THEN
+            print*,"calling write_pbl_vars"
+          CALL write_pbl_vars(exner(i,:,j),dz(i,:,j), &
+                  itimestep/100, 1, 1, kde-kds+1)
+          ! CALL close_pbl_netcdf()
+
+      ELSE
+            print*,"not the grid"  
+      ENDIF
+
+
       !3d variables
       do k=kts,kte
          u1(k)       = u(i,k,j)
@@ -535,6 +569,7 @@
                             errmsg , errflg                          )
 
 !     print*,"In mynn wrapper, calling mynnedmf"
+!      write(*,*) 'in edmf driver and before mynnedmf w1: ',w1
       call mynnedmf( &
             i               = i             , j           = j             ,                              &
             initflag        = initflag      , restart     = restart       , cycling     = cycling      , &

@@ -382,7 +382,7 @@ MODULE module_bl_mynnedmf
  integer, parameter :: bl_mynn_stfunc = 0
 
 !option to print out more stuff for debugging purposes
- logical, parameter :: debug_code = .false.
+ logical, parameter :: debug_code = .true.
  integer, parameter :: idbg = 452 !specific i-point to write out
  integer, parameter :: jdbg = 272 !specific i-point to write out
 
@@ -600,6 +600,7 @@ CONTAINS
 
     errmsg = " "
     errflg = 0
+ CALL wrf_message('Hello from mynnedmf scheme')
 
     if (debug_code) then !check incoming values
        problem = .false.
