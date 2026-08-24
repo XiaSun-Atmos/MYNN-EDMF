@@ -118,7 +118,7 @@ module module_bl_mynnedmf_tests
              maxtkeprod(:,:), cldtop_cooling(:,:)
         integer, allocatable :: kpbl(:,:)
         real, allocatable :: pblh_loc(:,:)
-        real, allocatable :: lwp(:,:), iwp(:,:), swp(:,:)
+        real, allocatable :: lwp(:,:), iwp(:,:), swp(:,:), wspd10(:,:), wspd80(:,:), wspd160(:,:)
         
         ! 3D arrays
         real, allocatable :: u_loc(:,:,:),v_loc(:,:,:), w_loc(:,:,:), th_loc(:,:,:), t3d_loc(:,:,:),& 
@@ -250,6 +250,9 @@ module module_bl_mynnedmf_tests
         allocate(lwp(ims:ime, jms:jme))
         allocate(iwp(ims:ime, jms:jme))
         allocate(swp(ims:ime, jms:jme))
+        allocate(wspd10(ims:ime, jms:jme))
+        allocate(wspd80(ims:ime, jms:jme))
+        allocate(wspd160(ims:ime, jms:jme))
 
         ! allocate 3D arrays
         allocate(qBUOY_loc(ims:ime, kms:kme, jms:jme))
@@ -501,30 +504,31 @@ module module_bl_mynnedmf_tests
                   dx=dx2d              , xland=xland         , ps=ps               , ts=ts              , &
                   qsfc=qsfc            , ust=ust             , ch=ch               , hfx=hfx            , &
                   qfx=qfx              , wspd=wspd           , znt=znt             ,                      &
-                  uoce=uoce            , voce=voce           , dz=dz_loc               , u=u_loc                , &
+                  uoce=uoce            , voce=voce           , dz=dz_loc               , u=u_loc                        , &
                   v=v_loc                  , w=w_loc                 , th=th_loc               , tk=t3d_loc             , &
                   p=p_loc                  , exner=exner_loc         , rho=rho_loc             , qv=qv_loc              , &
                   qc=qc_loc                , qi=qi_loc               , qs=qs_loc               , qnc=qnc_loc            , &
                   qni=qni_loc              , qnifa=qnifa_loc         , qnwfa=qnwfa_loc         ,qnbca=qnbca_loc         , &
 !                  qoz=qoz              ,                                                                  &
-                  rthraten=rthraten_loc    , pblh=pblh_loc           , kpbl=kpbl           , maxwidth_dd=maxwidth_dd,&
-                  cldfra_bl=cldfra_bl_loc  , qc_bl=qc_bl_loc         , qi_bl=qi_bl_loc          , maxwidth=maxwidth , &
-                  maxmf=maxmf          , ztop_plume=ztop_plume, excess_h=excess_h   , excess_q=excess_q , &
-                  maxmf_dd=maxmf_dd    , maxtkeprod=maxtkeprod, cldtop_cooling=cldtop_cooling, ent_eff=ent_eff, &
-                  lwp=lwp              , iwp=iwp              , swp=swp,                                        &
-                  qke=qke_loc              , qke_adv=qke_adv_loc     ,                                            &
-                  tsq=tsq_loc              , qsq=qsq_loc             , cov=cov_loc             ,                      &
+                  rthraten=rthraten_loc    , pblh=pblh_loc           , kpbl=kpbl           , maxwidth_dd=maxwidth_dd    , &
+                  cldfra_bl=cldfra_bl_loc  , qc_bl=qc_bl_loc         , qi_bl=qi_bl_loc          , maxwidth=maxwidth     , &
+                  maxmf=maxmf          , ztop_plume=ztop_plume, excess_h=excess_h   , excess_q=excess_q ,                 &
+                  maxmf_dd=maxmf_dd    , maxtkeprod=maxtkeprod, cldtop_cooling=cldtop_cooling, ent_eff=ent_eff,           &
+                  lwp=lwp              , iwp=iwp              , swp=swp,                                                  &
+                  wspd10=wspd10        , wspd80=wspd80        , wspd160=wspd160,                                          &
+                  qke=qke_loc              , qke_adv=qke_adv_loc     ,                                                    &
+                  tsq=tsq_loc              , qsq=qsq_loc             , cov=cov_loc             ,                          &
                   el_pbl=el_pbl_loc        , rublten=rublten_loc     , rvblten=rvblten_loc     , rthblten=rthblten_loc  , &
                   rqvblten=rqvblten_loc    , rqcblten=rqcblten_loc   , rqiblten=rqiblten_loc   , rqsblten=rqsblten_loc  , &
                   rqncblten=rqncblten_loc  , rqniblten=rqniblten_loc , rqnifablten=rqnifablten_loc,rqnwfablten=rqnwfablten_loc, &
-                  rqnbcablten=rqnbcablten_loc,                                                                &
+                  rqnbcablten=rqnbcablten_loc,                                                                            &
 !                  rqozblten=rqozblten  ,                                                                 &
-                  edmf_a=edmf_a_loc        , edmf_w=edmf_w_loc       ,                                            &
+                  edmf_a=edmf_a_loc        , edmf_w=edmf_w_loc       ,                                                    &
                   edmf_qt=edmf_qt_loc      , edmf_thl=edmf_thl_loc   , edmf_ent=edmf_ent_loc   , edmf_qc=edmf_qc_loc    , &
                   sub_thl=sub_thl3d_loc    , sub_sqv=sub_sqv3d_loc   , det_thl=det_thl3d_loc   , det_sqv=det_sqv3d_loc  , &
                   exch_h=exch_h_loc        , exch_m=exch_m_loc       , dqke=dqke_loc           , qwt=qwt_loc            , &
                   qshear=qshear_loc        , qbuoy=qbuoy_loc         , qdiss=qdiss_loc         , sh3d=sh3d_loc          , &
-                  sm3d=sm3d_loc            , spp_pbl=spp_pbl     , pattern_spp=pattern_spp_pbl,               &
+                  sm3d=sm3d_loc            , spp_pbl=spp_pbl     , pattern_spp=pattern_spp_pbl,           &
                   bl_mynn_tkeadvect    = bl_mynn_tkeadvect   , tke_budget          = tke_budget         , &
                   bl_mynn_cloudpdf     = bl_mynn_cloudpdf    , bl_mynn_mixlength   = bl_mynn_mixlength  , &
                   bl_mynn_closure      = bl_mynn_closure     , bl_mynn_edmf        = bl_mynn_edmf       , &

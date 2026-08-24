@@ -9,7 +9,7 @@
 !=================================================================================================================
  module module_bl_mynnedmf_driver
 
- use module_bl_mynnedmf_diags, only: cloud_water_path
+ use module_bl_mynnedmf_diags, only: cloud_water_path, wspd_at_hgts
  use module_bl_mynnedmf_common,only: kind_phys,xlvcp,xlscp
  use module_bl_mynnedmf,only: mynnedmf
 
@@ -111,7 +111,10 @@
                   pblh              , kpbl              , maxwidth           ,                      &
                   maxmf             , ztop_plume        , excess_h           , excess_q           , &
                   maxwidth_dd       , maxmf_dd          , maxtkeprod         , cldtop_cooling     , &
-                  ent_eff           , lwp               , iwp                , swp                , &
+                  ent_eff           ,                                                               &
+                  !optional 2d diagnostic output
+                  lwp               , iwp               , swp                , wspd10             , &
+                  wspd80            , wspd160           ,                                           &
                   !optional 3d output
                   edmf_a            , edmf_w            ,                                           &
                   edmf_qt           , edmf_thl          , edmf_ent           , edmf_qc            , &
@@ -284,6 +287,10 @@
     lwp,      &!
     iwp,      &!
     swp
+ real(kind_phys),intent(out),dimension(ims:ime,jms:jme),optional::   &
+    wspd10,      &!
+    wspd80,      &!
+    wspd160
 
 !--- output arguments:
  character(len=*),intent(out):: &
@@ -361,7 +368,7 @@
     pattern_spp1
 
  real(kind_phys):: &
-    pblh1
+    pblh1, lwp1, iwp1, swp1, wspd101, wspd801, wspd1601
 
  real(kind_phys),dimension(kts:kte):: &
     cldfra_bl1,qc_bl1,qi_bl1,el_pbl1,qke1,qke_adv1,cov1,qsq1,tsq1,sh1,sm1
@@ -859,6 +866,26 @@
     deallocate(chem1)
     deallocate(settle1)
 
+    !--- calculating MYNN-EDMF diagnostics:
+    if (debug) then
+       write(0,*)"bl_mynn_diags ", bl_mynn_diags
+       write(0,*)"In mynnedmf driver, just before call to bl_mynn_diags"
+    endif
+
+    if (bl_mynn_diags >= 1) then
+       call cloud_water_path (kts, kte, p1, qc1, qi1, qs1, qc_bl1, qi_bl1, cldfra_bl1,       &
+                           lwp1, iwp1, swp1)
+       lwp(i,j) = lwp1
+       iwp(i,j) = iwp1
+       swp(i,j) = swp1
+       if (bl_mynn_diags >= 2) then
+          call wspd_at_hgts (kts, kte, dz1, u1, v1, wspd101, wspd801, wspd1601)
+          wspd10(i,j)  = wspd101
+          wspd80(i,j)  = wspd801
+          wspd160(i,j) = wspd1601
+       endif
+    endif
+
  enddo !i
  enddo !j
 
@@ -869,22 +896,6 @@
    deallocate(qbuoy1    )
    deallocate(qdiss1    )
  endif
-
- !--- calculating MYNN-EDMF diagnostics:
- if (debug) then
-    write(0,*)"bl_mynn_diags ", bl_mynn_diags
-    write(0,*)"In mynnedmf driver, just before call to bl_mynn_diags"
- endif
- 
- if (bl_mynn_diags >= 1) then
-    call cloud_water_path (its, ite, kts, kte, jts, jte,               &
-                        ims, ime, kms, kme, jms, jme,                  &
-                        dz, qc, qi, qs, qc_bl, qi_bl, cldfra_bl,       &
-                        lwp, iwp, swp)
-    ! if (bl_mynn_diags >= 2) then
-
-    ! endif
- endif 
 
  if (debug) then
    print*,"In mynnedmf_driver, at end"
