@@ -9,7 +9,7 @@
 !=================================================================================================================
  module module_bl_mynnedmf_driver
 
- use module_bl_mynnedmf_diags, only: cloud_water_path, wspd_at_hgts
+ use module_bl_mynnedmf_diags, only: cloud_water_path, wspd_at_hgts, cloud_ceiling
  use module_bl_mynnedmf_common,only: kind_phys,xlvcp,xlscp
  use module_bl_mynnedmf,only: mynnedmf
 
@@ -114,7 +114,7 @@
                   ent_eff           ,                                                               &
                   !optional 2d diagnostic output
                   lwp               , iwp               , swp                , wspd10             , &
-                  wspd80            , wspd160           ,                                           &
+                  wspd80            , wspd160           , cldceil            ,                      &
                   !optional 3d output
                   edmf_a            , edmf_w            ,                                           &
                   edmf_qt           , edmf_thl          , edmf_ent           , edmf_qc            , &
@@ -290,7 +290,8 @@
  real(kind_phys),intent(out),dimension(ims:ime,jms:jme),optional::   &
     wspd10,      &!
     wspd80,      &!
-    wspd160
+    wspd160,     &!
+    cldceil
 
 !--- output arguments:
  character(len=*),intent(out):: &
@@ -368,7 +369,7 @@
     pattern_spp1
 
  real(kind_phys):: &
-    pblh1, lwp1, iwp1, swp1, wspd101, wspd801, wspd1601
+    pblh1, lwp1, iwp1, swp1, wspd101, wspd801, wspd1601, cldceil1
 
  real(kind_phys),dimension(kts:kte):: &
     cldfra_bl1,qc_bl1,qi_bl1,el_pbl1,qke1,qke_adv1,cov1,qsq1,tsq1,sh1,sm1
@@ -878,6 +879,11 @@
        lwp(i,j) = lwp1
        iwp(i,j) = iwp1
        swp(i,j) = swp1
+
+       call cloud_ceiling (kts, kte, dz1, tk1, qc1, qi1, qs1, qc_bl1, qi_bl1,                &
+                cldfra_bl1, rho1, xland1, cldceil1)
+       cldceil(i,j) = cldceil1
+
        if (bl_mynn_diags >= 2) then
           call wspd_at_hgts (kts, kte, dz1, u1, v1, wspd101, wspd801, wspd1601)
           wspd10(i,j)  = wspd101

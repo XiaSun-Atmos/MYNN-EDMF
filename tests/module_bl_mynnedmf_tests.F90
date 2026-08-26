@@ -118,7 +118,8 @@ module module_bl_mynnedmf_tests
              maxtkeprod(:,:), cldtop_cooling(:,:)
         integer, allocatable :: kpbl(:,:)
         real, allocatable :: pblh_loc(:,:)
-        real, allocatable :: lwp(:,:), iwp(:,:), swp(:,:), wspd10(:,:), wspd80(:,:), wspd160(:,:)
+        real, allocatable :: lwp(:,:), iwp(:,:), swp(:,:), wspd10(:,:), wspd80(:,:), wspd160(:,:),  &
+             cldceil(:,:)
         
         ! 3D arrays
         real, allocatable :: u_loc(:,:,:),v_loc(:,:,:), w_loc(:,:,:), th_loc(:,:,:), t3d_loc(:,:,:),& 
@@ -253,6 +254,7 @@ module module_bl_mynnedmf_tests
         allocate(wspd10(ims:ime, jms:jme))
         allocate(wspd80(ims:ime, jms:jme))
         allocate(wspd160(ims:ime, jms:jme))
+        allocate(cldceil(ims:ime, jms:jme))
 
         ! allocate 3D arrays
         allocate(qBUOY_loc(ims:ime, kms:kme, jms:jme))
@@ -515,7 +517,7 @@ module module_bl_mynnedmf_tests
                   maxmf=maxmf          , ztop_plume=ztop_plume, excess_h=excess_h   , excess_q=excess_q ,                 &
                   maxmf_dd=maxmf_dd    , maxtkeprod=maxtkeprod, cldtop_cooling=cldtop_cooling, ent_eff=ent_eff,           &
                   lwp=lwp              , iwp=iwp              , swp=swp,                                                  &
-                  wspd10=wspd10        , wspd80=wspd80        , wspd160=wspd160,                                          &
+                  wspd10=wspd10        , wspd80=wspd80        , wspd160=wspd160     , cldceil=cldceil,                    &
                   qke=qke_loc              , qke_adv=qke_adv_loc     ,                                                    &
                   tsq=tsq_loc              , qsq=qsq_loc             , cov=cov_loc             ,                          &
                   el_pbl=el_pbl_loc        , rublten=rublten_loc     , rvblten=rvblten_loc     , rthblten=rthblten_loc  , &

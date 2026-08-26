@@ -5,7 +5,7 @@ module module_bl_mynnedmf_diags
   real(kind_phys),parameter::zero=0.0
   
   private
-  public :: cloud_water_path, wspd_at_hgts !, pblh, cloud_ceiling
+  public :: cloud_water_path, wspd_at_hgts, cloud_ceiling ! pblh
 
   contains
 
@@ -82,7 +82,7 @@ module module_bl_mynnedmf_diags
     wspd1601  = -99._kind_phys
     do k = kts, kte-1
       z_agl0 = z_agl
-      z_agl = zw1(k) + 0.5 * dz1(k)  ! at mass point AGL
+      z_agl = zw1(k) + 0.5_kind_phys * dz1(k)  ! at mass point AGL
       zw1(k+1) = zw1(k) + dz1(k)     ! at interface
       depth = z_agl - z_agl0
       !print*, 'depth', depth,'z_agl',z_agl, 'wspd', sqrt(u1(k)**2+v1(k)**2)
@@ -112,6 +112,104 @@ module module_bl_mynnedmf_diags
 
   end subroutine wspd_at_hgts
 
+!===================================================================
+! Subroutine to calculate cloud ceiling based on cloud optical depth
+!===================================================================
+  subroutine cloud_ceiling (kts, kte, dz1, tk1, qc1, qi1, qs1, qc_bl1,              &
+                qi_bl1, cldfra_bl1, rho1, xland1, cldceil1)
+    implicit none
+
+    integer, intent(in) :: kts, kte
+    real(kind_phys), intent(in) :: xland1
+    real(kind_phys), dimension(kts:kte), intent(in) :: dz1, tk1, qc1, qi1, qs1,      &
+                      rho1
+    real(kind_phys), dimension(kts:kte), intent(in), optional :: qc_bl1, qi_bl1,     &
+                      cldfra_bl1 
+    real(kind_phys), dimension(kts:kte) :: zw1
+    real(kind_phys) :: cld_depth, z_agl0, z_agl, cldtau1, re_i, re_c,                &
+                qctotal, qftotal, sum_cldtau
+    logical :: check_fog_layer
+    real(kind_phys), intent(out) :: cldceil1
+    integer :: k
+
+    !---constants---
+    real(kind_phys),parameter :: cldtau_thld  = 2.0           ! threshold for cloud optical depth
+    real(kind_phys),parameter :: min_cloud_dz = 40.0          ! threshold for meaningful fog layer
+    real(kind_phys),parameter :: rho_w        = 1000.0        ! water density
+    real(kind_phys),parameter :: rho_i        = 917.0         ! ice density
+  
+    ! use constant water cloud effective radius over land and water
+    if (xland1 == 1.0) then     ! over land
+      re_c = 7.0e-6_kind_phys
+    else                        ! over water
+      re_c = 1.1e-5_kind_phys
+    endif
+
+    zw1(kts)   = zero
+    z_agl      = zero
+    sum_cldtau = zero
+    check_fog_layer = .false.
+    cldceil1   = -99._kind_phys ! default value for no cloud ceiling
+    cld_depth  = zero
+
+    do k = kts, kte-1
+      z_agl0 = z_agl
+      z_agl = zw1(k) + 0.5_kind_phys * dz1(k)  ! at mass point AGL
+      zw1(k+1) = zw1(k) + dz1(k)               ! at interface
+
+      if (present(qc_bl1) .and. present(cldfra_bl1) .and. qc1(k)<1e-6 .and.      &
+        cldfra_bl1(k)>0.01) then
+        qctotal = qc_bl1(k)
+      else
+        qctotal = qc1(k)
+      endif
+
+      if (present(qi_bl1) .and. present(cldfra_bl1) .and. qi1(k)<1e-9 .and.      &
+        cldfra_bl1(k)>0.01) then
+        qftotal = qi_bl1(k)+qs1(k)
+      else
+        qftotal = qi1(k)+qs1(k)
+      endif
+
+      ! temperature-dependent ice cloud effective radius (Mishara et al. 2014)
+      re_i = 173.46_kind_phys + 2.14_kind_phys * (tk1(k) - 273.15_kind_phys)
+
+      cldtau1= (1.5_kind_phys * qctotal * rho1(k) * dz1(k) / (rho_w * re_c)) +   &
+                (1.5_kind_phys * qftotal * rho1(k) * dz1(k) / (rho_i *re_i))
+      !print*, 'cldtau1', cldtau1, 'cldfra_bl1', cldfra_bl1(k), 'qctotal', qctotal
+
+      if (cldtau1 > zero .and. cldfra_bl1(k) >= 0.5_kind_phys) then
+        cld_depth =cld_depth + dz1(k)                             ! track cloud depth
+        sum_cldtau = sum_cldtau + cldtau1
+
+        if (k==1 .or. k==2) check_fog_layer = .true.
+        if (cld_depth >= min_cloud_dz) check_fog_layer = .false.
+
+      else
+        if (check_fog_layer .and. cld_depth < min_cloud_dz) then  ! fog layer detected
+          sum_cldtau = zero
+          cld_depth  = zero
+          check_fog_layer = .false.
+          cycle ! to next k level
+        endif
+
+        ! clear sky or cloud ended; reset cloud depth for higher clouds
+        sum_cldtau      = zero
+        cld_depth       = zero
+        check_fog_layer = .false.
+      endif
+
+      if (.not. check_fog_layer) then
+        if (sum_cldtau >= cldtau_thld .and. cldfra_bl1(k) >= 0.5) then
+          cldceil1 = zw1(k) + ((sum_cldtau-cldtau_thld)/cldtau1) * dz1(k)
+          print*, 'k', k, 'cldceil1', cldceil1
+          exit
+        endif
+      endif
+
+    enddo
+
+  end subroutine cloud_ceiling
 
   function interpolate_wind(k_idx, kts, target_z, z_agl,                      &
                             u1_curr,v1_curr, u1_prev, v1_prev, depth)         &
