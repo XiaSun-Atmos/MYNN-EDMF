@@ -9,7 +9,7 @@
 !=================================================================================================================
  module module_bl_mynnedmf_driver
 
- use module_bl_mynnedmf_diags, only: cloud_water_path, wspd_at_hgts, cloud_ceiling
+ use module_bl_mynnedmf_diags, only: mynnedmf_diags
  use module_bl_mynnedmf_common,only: kind_phys,xlvcp,xlscp
  use module_bl_mynnedmf,only: mynnedmf
 
@@ -869,27 +869,32 @@
 
     !--- calculating MYNN-EDMF diagnostics:
     if (debug) then
-       write(0,*)"bl_mynn_diags ", bl_mynn_diags
-       write(0,*)"In mynnedmf driver, just before call to bl_mynn_diags"
+       write(0,*)"bl_mynn_diags=", bl_mynn_diags
+       write(0,*)"In mynnedmf driver, just before call to mynnedmf_diags"
     endif
 
     if (bl_mynn_diags >= 1) then
-       call cloud_water_path (kts, kte, p1, qc1, qi1, qs1, qc_bl1, qi_bl1, cldfra_bl1,       &
-                           lwp1, iwp1, swp1)
+       call mynnedmf_diags (&
+               kts  = kts , kte    = kte    , p1         = p1        , dz1  =  dz1  , u1     = u1     ,  &
+               v1   = v1  , tk1    = tk1    , qc1        = qc1       , qi1  =  qi1  ,                    &
+               qs1  = qs1 , qc_bl1 = qc_bl1 , cldfra_bl1 = cldfra_bl1, rho1 =  rho1 , xland1 = xland1 ,  &
+               ! diagnostic outputs
+               lwp1     = lwp1   , iwp1    = iwp1   , swp1       = swp1      , cldceil1 = cldceil1,      &
+               wspd101  = wspd101, wspd801 = wspd801, wspd1601   = wspd1601  ,                           &
+               bl_mynn_diags = bl_mynn_diags )
+
+       ! collect diagnostic output
        lwp(i,j) = lwp1
        iwp(i,j) = iwp1
        swp(i,j) = swp1
-
-       call cloud_ceiling (kts, kte, dz1, tk1, qc1, qi1, qs1, qc_bl1, qi_bl1,                &
-                cldfra_bl1, rho1, xland1, cldceil1)
        cldceil(i,j) = cldceil1
 
        if (bl_mynn_diags >= 2) then
-          call wspd_at_hgts (kts, kte, dz1, u1, v1, wspd101, wspd801, wspd1601)
           wspd10(i,j)  = wspd101
           wspd80(i,j)  = wspd801
           wspd160(i,j) = wspd1601
        endif
+
     endif
 
  enddo !i

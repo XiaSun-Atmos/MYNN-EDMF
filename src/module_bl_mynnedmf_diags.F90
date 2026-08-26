@@ -4,54 +4,86 @@ module module_bl_mynnedmf_diags
   implicit none
   real(kind_phys),parameter::zero=0.0
   
-  private
-  public :: cloud_water_path, wspd_at_hgts, cloud_ceiling ! pblh
+!  private
+!  public :: cloud_water_path, wspd_at_hgts, cloud_ceiling ! pblh
 
   contains
 
 !===================================================================
-! Subroutine to calculate LWP, IWP, and SWP
+! Subroutine to call MYNN-EDMF diagnostics
 !===================================================================
-  subroutine cloud_water_path (kts, kte, p1, qc1, qi1, qs1, qc_bl1, qi_bl1,      &
-                cldfra_bl1, lwp1, iwp1, swp1)
+  subroutine mynnedmf_diags (kts, kte, p1, dz1, u1, v1, tk1, qc1, qi1, qs1,        &
+                qc_bl1, qi_bl1, cldfra_bl1, rho1, xland1, lwp1, iwp1, swp1,        &
+                cldceil1, wspd101, wspd801, wspd1601, bl_mynn_diags)
     implicit none
 
     integer, intent(in) :: kts, kte
-    real(kind_phys), dimension(kts:kte), intent(in) :: p1, qc1, qi1, qs1
-    real(kind_phys), dimension(kts:kte), intent(in), optional :: qc_bl1, qi_bl1, &
-                                                      cldfra_bl1 
+    integer, intent(in) :: bl_mynn_diags
+    real(kind_phys), intent(in) :: xland1
+    real(kind_phys), dimension(kts:kte), intent(in) :: p1, dz1, u1, v1, tk1, qc1,  &
+                       qi1, qs1, rho1
+    real(kind_phys), dimension(kts:kte), intent(in), optional :: qc_bl1, qi_bl1,   &
+                       cldfra_bl1 
+    real(kind_phys), dimension(kts:kte) :: qctotal1, qitotal1, qstotal1
+    real(kind_phys), intent(inout), optional :: lwp1, iwp1, swp1
+    real(kind_phys), intent(out)  , optional :: cldceil1, wspd101, wspd801, wspd1601
+
+    integer :: k
+
+    do k = kts, kte
+      if (present(qc_bl1) .and. present(cldfra_bl1) .and. qc1(k)<1e-6 .and.        &
+        cldfra_bl1(k)>0.01) then
+        qctotal1(k) = qc_bl1(k)
+      else
+        qctotal1(k) = qc1(k)
+      endif
+
+      if (present(qi_bl1) .and. present(cldfra_bl1) .and. qi1(k)<1e-9 .and.        &
+        cldfra_bl1(k)>0.01) then
+        qitotal1(k) = qi_bl1(k)
+      else
+        qitotal1(k) = qi1(k)
+      endif
+
+      qstotal1(k) = qs1(k) !there currently is no sgs snow, it's ice+snow...
+    end do
+
+    call cloud_water_path (kts, kte, p1, qctotal1, qitotal1, qstotal1,              &
+          lwp1, iwp1, swp1)
+
+    call cloud_ceiling (kts, kte, dz1, tk1, qctotal1, qitotal1, qstotal1,           &
+          cldfra_bl1, rho1, xland1, cldceil1)
+
+    if (bl_mynn_diags >= 2) then
+      call wspd_at_hgts (kts, kte, dz1, u1, v1, wspd101, wspd801, wspd1601)
+    endif
+
+  end subroutine mynnedmf_diags
+
+!===================================================================
+! Subroutine to calculate LWP, IWP, and SWP
+!===================================================================
+  subroutine cloud_water_path (kts, kte, p1, qctotal1, qitotal1, qstotal1,          &
+                lwp1, iwp1, swp1)
+    implicit none
+
+    integer, intent(in) :: kts, kte
+    real(kind_phys), dimension(kts:kte), intent(in) :: p1, qctotal1, qitotal1, qstotal1
     real(kind_phys), intent(inout), optional :: lwp1, iwp1, swp1
 
     ! local variables
-    real(kind_phys) :: dp, sum1, sum2, sum3, qctotal, qitotal, qstotal
+    real(kind_phys) :: dp, sum1, sum2, sum3
     integer :: k
 
-       
     sum1=zero
     sum2=zero
     sum3=zero
 
     do k = kts, kte-1
       dp = p1(k) - p1(k+1)
-      if (present(qc_bl1) .and. present(cldfra_bl1) .and. qc1(k)<1e-6 .and.      &
-        cldfra_bl1(k)>0.01) then
-        qctotal = qc_bl1(k)
-      else
-        qctotal = qc1(k)
-      endif
-
-      if (present(qi_bl1) .and. present(cldfra_bl1) .and. qi1(k)<1e-9 .and.      &
-        cldfra_bl1(k)>0.01) then
-        qitotal = qi_bl1(k)
-      else
-        qitotal = qi1(k)
-      endif
-
-      qstotal = qs1(k) !there currently is no sgs snow, it's ice+snow...
-
-      sum1 = sum1 + max((dp/grav) * qctotal, zero)
-      sum2 = sum2 + max((dp/grav) * (qitotal+qstotal), zero) !actually frozen water path
-      sum3 = sum3 + max((dp/grav) * qstotal, zero)
+      sum1 = sum1 + max((dp/grav) * qctotal1(k), zero)
+      sum2 = sum2 + max((dp/grav) * (qitotal1(k)+qstotal1(k)), zero) !actually frozen water path
+      sum3 = sum3 + max((dp/grav) * qstotal1(k), zero)
     enddo
 
     lwp1 = sum1 * 1000._kind_phys ! kg m-2  --> g m-2
@@ -115,19 +147,16 @@ module module_bl_mynnedmf_diags
 !===================================================================
 ! Subroutine to calculate cloud ceiling based on cloud optical depth
 !===================================================================
-  subroutine cloud_ceiling (kts, kte, dz1, tk1, qc1, qi1, qs1, qc_bl1,              &
-                qi_bl1, cldfra_bl1, rho1, xland1, cldceil1)
+  subroutine cloud_ceiling (kts, kte, dz1, tk1, qctotal1, qitotal1, qstotal1,       &
+                cldfra_bl1, rho1, xland1, cldceil1)
     implicit none
 
     integer, intent(in) :: kts, kte
     real(kind_phys), intent(in) :: xland1
-    real(kind_phys), dimension(kts:kte), intent(in) :: dz1, tk1, qc1, qi1, qs1,      &
-                      rho1
-    real(kind_phys), dimension(kts:kte), intent(in), optional :: qc_bl1, qi_bl1,     &
-                      cldfra_bl1 
+    real(kind_phys), dimension(kts:kte), intent(in) :: dz1, tk1, rho1, cldfra_bl1
+    real(kind_phys), dimension(kts:kte), intent(in) :: qctotal1, qitotal1, qstotal1
     real(kind_phys), dimension(kts:kte) :: zw1
-    real(kind_phys) :: cld_depth, z_agl0, z_agl, cldtau1, re_i, re_c,                &
-                qctotal, qftotal, sum_cldtau
+    real(kind_phys) :: cld_depth, z_agl0, z_agl, cldtau1, re_i, re_c, sum_cldtau
     logical :: check_fog_layer
     real(kind_phys), intent(out) :: cldceil1
     integer :: k
@@ -137,7 +166,7 @@ module module_bl_mynnedmf_diags
     real(kind_phys),parameter :: min_cloud_dz = 40.0          ! threshold for meaningful fog layer
     real(kind_phys),parameter :: rho_w        = 1000.0        ! water density
     real(kind_phys),parameter :: rho_i        = 917.0         ! ice density
-  
+
     ! use constant water cloud effective radius over land and water
     if (xland1 == 1.0) then     ! over land
       re_c = 7.0e-6_kind_phys
@@ -157,25 +186,11 @@ module module_bl_mynnedmf_diags
       z_agl = zw1(k) + 0.5_kind_phys * dz1(k)  ! at mass point AGL
       zw1(k+1) = zw1(k) + dz1(k)               ! at interface
 
-      if (present(qc_bl1) .and. present(cldfra_bl1) .and. qc1(k)<1e-6 .and.      &
-        cldfra_bl1(k)>0.01) then
-        qctotal = qc_bl1(k)
-      else
-        qctotal = qc1(k)
-      endif
-
-      if (present(qi_bl1) .and. present(cldfra_bl1) .and. qi1(k)<1e-9 .and.      &
-        cldfra_bl1(k)>0.01) then
-        qftotal = qi_bl1(k)+qs1(k)
-      else
-        qftotal = qi1(k)+qs1(k)
-      endif
-
       ! temperature-dependent ice cloud effective radius (Mishara et al. 2014)
       re_i = 173.46_kind_phys + 2.14_kind_phys * (tk1(k) - 273.15_kind_phys)
 
-      cldtau1= (1.5_kind_phys * qctotal * rho1(k) * dz1(k) / (rho_w * re_c)) +   &
-                (1.5_kind_phys * qftotal * rho1(k) * dz1(k) / (rho_i *re_i))
+      cldtau1= (1.5_kind_phys * qctotal1(k) * rho1(k) * dz1(k) / (rho_w * re_c)) +   &
+                (1.5_kind_phys * (qitotal1(k)+qstotal1(k)) * rho1(k) * dz1(k) / (rho_i *re_i))
       !print*, 'cldtau1', cldtau1, 'cldfra_bl1', cldfra_bl1(k), 'qctotal', qctotal
 
       if (cldtau1 > zero .and. cldfra_bl1(k) >= 0.5_kind_phys) then
