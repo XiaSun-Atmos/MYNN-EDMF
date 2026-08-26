@@ -549,8 +549,13 @@ module module_bl_mynnedmf_tests
                   errmsg=errmsg        , errflg=errflg                                                    &
                   )
              
-            print '(A, I4, 3(A, F8.3))', 't =', t, ' | U = ', u_loc(1, 1, 1), ' | LWP = ',                &
-                    lwp(1, 1), ' | Ceiling = ', cldceil(1,1)
+            if (case /= 'clr' .and. bl_mynn_diags >= 1) then
+                print '(A, I4, 3(A, F8.3))', 't =', t, ' | U = ', u_loc(1, 1, 1), ' | LWP = ',                &
+                        lwp(1, 1), ' | Ceiling = ', cldceil(1,1)
+            else
+                print '(A, I4, 1(A, F8.3))', 't =', t, ' | U = ', u_loc(1, 1, 1)
+            endif
+            
         enddo
         
         ! Close file and deallocate
