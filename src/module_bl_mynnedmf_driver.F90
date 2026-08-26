@@ -875,18 +875,19 @@
 
     if (bl_mynn_diags >= 1) then
        call mynnedmf_diags (&
-               kts  = kts , kte    = kte    , p1         = p1        , dz1  =  dz1  , u1     = u1     ,  &
-               v1   = v1  , tk1    = tk1    , qc1        = qc1       , qi1  =  qi1  ,                    &
-               qs1  = qs1 , qc_bl1 = qc_bl1 , cldfra_bl1 = cldfra_bl1, rho1 =  rho1 , xland1 = xland1 ,  &
+               kts  = kts , kte    = kte    , p1         = p1        , dz1  =  dz1  , u1     = u1       ,&
+               v1   = v1  , tk1    = tk1    , qc1        = qc1       , qi1  =  qi1                      ,&
+               qs1  = qs1 , qc_bl1 = qc_bl1 , qi_bl1     = qi_bl1    , cldfra_bl1 = cldfra_bl1          ,&        
+               rho1 = rho , xland1 = xland1 ,                                                            &
                ! diagnostic outputs
-               lwp1     = lwp1   , iwp1    = iwp1   , swp1       = swp1      , cldceil1 = cldceil1,      &
-               wspd101  = wspd101, wspd801 = wspd801, wspd1601   = wspd1601  ,                           &
+               lwp1     = lwp1   , iwp1    = iwp1   , swp1       = swp1      , cldceil1 = cldceil1      ,&
+               wspd101  = wspd101, wspd801 = wspd801, wspd1601   = wspd1601                             ,&
                bl_mynn_diags = bl_mynn_diags )
 
        ! collect diagnostic output
-       lwp(i,j) = lwp1
-       iwp(i,j) = iwp1
-       swp(i,j) = swp1
+       lwp(i,j)     = lwp1
+       iwp(i,j)     = iwp1
+       swp(i,j)     = swp1
        cldceil(i,j) = cldceil1
 
        if (bl_mynn_diags >= 2) then

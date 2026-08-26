@@ -1,5 +1,5 @@
 module module_bl_mynnedmf_diags
-  use module_bl_mynnedmf_common, only: kind_phys,grav
+  use module_bl_mynnedmf_common, only: kind_phys,g_inv
 
   implicit none
   real(kind_phys),parameter::zero=0.0
@@ -25,7 +25,7 @@ module module_bl_mynnedmf_diags
     real(kind_phys), dimension(kts:kte), intent(in), optional :: qc_bl1, qi_bl1,   &
                        cldfra_bl1 
     real(kind_phys), dimension(kts:kte) :: qctotal1, qitotal1, qstotal1
-    real(kind_phys), intent(inout), optional :: lwp1, iwp1, swp1
+    real(kind_phys), intent(out)  , optional :: lwp1, iwp1, swp1
     real(kind_phys), intent(out)  , optional :: cldceil1, wspd101, wspd801, wspd1601
 
     integer :: k
@@ -79,9 +79,9 @@ module module_bl_mynnedmf_diags
 
     do k = kts, kte-1
       dp = p1(k) - p1(k+1)
-      sum1 = sum1 + max((dp/grav) * qctotal1(k), zero)
-      sum2 = sum2 + max((dp/grav) * qitotal1(k), zero)
-      sum3 = sum3 + max((dp/grav) * qstotal1(k), zero)
+      sum1 = sum1 + max((dp * g_inv) * qctotal1(k), zero)
+      sum2 = sum2 + max((dp * g_inv) * qitotal1(k), zero)
+      sum3 = sum3 + max((dp * g_inv) * qstotal1(k), zero)
     enddo
 
     lwp1 = sum1 * 1000._kind_phys ! kg m-2  --> g m-2
