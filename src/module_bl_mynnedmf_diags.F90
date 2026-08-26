@@ -31,15 +31,13 @@ module module_bl_mynnedmf_diags
     integer :: k
 
     do k = kts, kte
-      if (present(qc_bl1) .and. present(cldfra_bl1) .and. qc1(k)<1e-6 .and.        &
-        cldfra_bl1(k)>0.01) then
+      if (qc1(k)<1e-6 .and. cldfra_bl1(k)>0.01) then
         qctotal1(k) = qc_bl1(k)
       else
         qctotal1(k) = qc1(k)
       endif
 
-      if (present(qi_bl1) .and. present(cldfra_bl1) .and. qi1(k)<1e-9 .and.        &
-        cldfra_bl1(k)>0.01) then
+      if (qi1(k)<1e-9 .and. cldfra_bl1(k)>0.01) then
         qitotal1(k) = qi_bl1(k)
       else
         qitotal1(k) = qi1(k)
@@ -82,7 +80,7 @@ module module_bl_mynnedmf_diags
     do k = kts, kte-1
       dp = p1(k) - p1(k+1)
       sum1 = sum1 + max((dp/grav) * qctotal1(k), zero)
-      sum2 = sum2 + max((dp/grav) * (qitotal1(k)+qstotal1(k)), zero) !actually frozen water path
+      sum2 = sum2 + max((dp/grav) * qitotal1(k), zero)
       sum3 = sum3 + max((dp/grav) * qstotal1(k), zero)
     enddo
 
@@ -231,8 +229,8 @@ module module_bl_mynnedmf_diags
                               result(wspd1_hgt)
 
     integer, intent(in) :: k_idx, kts
-    real, intent(in)    :: target_z, z_agl, u1_curr, v1_curr, u1_prev,        &
-            v1_prev, depth
+    real(kind_phys), intent(in)    :: target_z, z_agl, u1_curr, v1_curr,      &
+            u1_prev, v1_prev, depth
     real :: wspd1_hgt
 
     real :: wgt, wspd1_curr, wspd1_prev
