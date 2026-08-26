@@ -549,7 +549,8 @@ module module_bl_mynnedmf_tests
                   errmsg=errmsg        , errflg=errflg                                                    &
                   )
              
-            print '(A, I4, A, 100(F8.3, 1X))', 't =', t, ' | U = ', u_loc(1, 1, 1)       
+            print '(A, I4, 3(A, F8.3))', 't =', t, ' | U = ', u_loc(1, 1, 1), ' | LWP = ',                &
+                    lwp(1, 1), ' | Ceiling = ', cldceil(1,1)
         enddo
         
         ! Close file and deallocate

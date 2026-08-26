@@ -87,7 +87,7 @@ module module_bl_mynnedmf_diags
     lwp1 = sum1 * 1000._kind_phys ! kg m-2  --> g m-2
     iwp1 = sum2 * 1000._kind_phys
     swp1 = sum3 * 1000._kind_phys
-    print*, 'lwp', lwp1
+    ! print*, 'lwp', lwp1
 
   end subroutine cloud_water_path
 
@@ -121,21 +121,21 @@ module module_bl_mynnedmf_diags
       if (z_agl > 10. .and. wspd101 == -99.) then
         wspd101 = interpolate_wind (k, kts, 10.0, z_agl, u1(k), v1(k),            &
                     u1(k-1), v1(k-1), depth)
-        print*, 'k', k, 'wspd10', wspd101
+        ! print*, 'k', k, 'wspd10', wspd101
       endif
 
       ! 80-m wind speed
       if (z_agl > 80. .and. wspd801 == -99.) then
         wspd801 = interpolate_wind (k, kts, 80.0, z_agl, u1(k), v1(k),            &
                     u1(k-1), v1(k-1), depth)
-        print*, 'k', k, 'wspd80', wspd801
+        ! print*, 'k', k, 'wspd80', wspd801
       endif
 
       ! 160-m wind speed
       if (z_agl > 160. .and. wspd1601 == -99.) then
         wspd1601 = interpolate_wind (k, kts, 160.0, z_agl, u1(k), v1(k),          &
                     u1(k-1), v1(k-1), depth)
-        print*, 'k', k, 'wspd160', wspd1601
+        ! print*, 'k', k, 'wspd160', wspd1601
       endif
 
     enddo
@@ -215,7 +215,7 @@ module module_bl_mynnedmf_diags
       if (.not. check_fog_layer) then
         if (sum_cldtau >= cldtau_thld .and. cldfra_bl1(k) >= 0.5) then
           cldceil1 = zw1(k) + ((sum_cldtau-cldtau_thld)/cldtau1) * dz1(k)
-          print*, 'k', k, 'cldceil1', cldceil1
+          ! print*, 'k', k, 'cldceil1', cldceil1
           exit
         endif
       endif
