@@ -97,6 +97,7 @@
                   rho               , qv                , qc                 , qi                 , &
                   qs                , qnc               , qni                , qnifa              , &
                   qnwfa             , qnbca             , qoz                , rthraten           , &
+                  pint              ,                                                               &
                   !3d output
                   cldfra_bl         , qc_bl             , qi_bl              ,                      &
                   qke               , qke_adv           ,                                           &
@@ -199,27 +200,28 @@
     znt                  !
 
  real(kind_phys),intent(in),dimension(ims:ime,kms:kme,jms:jme):: &
-    dz,      &!
-    u,       &!
-    w,       &!
-    v,       &!
-    th,      &!
-    tk,      &!
-    p,       &!
-    exner,   &!
-    rho,     &!
-    qv,      &!
-    rthraten  !
+    dz,          &!
+    u,           &!
+    w,           &!
+    v,           &!
+    th,          &!
+    tk,          &!
+    p,           &!
+    pint,        &!
+    exner,       &!
+    rho,         &!
+    qv,          &!
+    rthraten      !
 
  real(kind_phys),intent(in),dimension(ims:ime,kms:kme,jms:jme),optional:: &
-    qc,      &!
-    qi,      &!
-    qs,      &!
-    qoz,     &!
-    qnc,      &!
-    qni,      &!
-    qnifa,    &!
-    qnwfa,    &!
+    qc,          &!
+    qi,          &!
+    qs,          &!
+    qoz,         &!
+    qnc,         &!
+    qni,         &!
+    qnifa,       &!
+    qnwfa,       &!
     qnbca
 
  real(kind_phys),intent(in),dimension(ims:ime,kms:kme,jms:jme),optional:: &
@@ -259,11 +261,11 @@
     rqiblten,    &!
     rqsblten,    &!
     rqozblten,   &!
-    rqncblten,    &!
-    rqniblten,    &!
-    rqnifablten,  &!
-    rqnwfablten,  &!
-    rqnbcablten    !
+    rqncblten,   &!
+    rqniblten,   &!
+    rqnifablten, &!
+    rqnwfablten, &!
+    rqnbcablten   !
 
  real(kind_phys),intent(inout),dimension(ims:ime,kms:kme,jms:jme),optional:: &
     edmf_a,      &!
@@ -337,12 +339,14 @@
 
  integer:: kpbl1
 
+ real(kind_phys):: max_hfx
+
  real(kind_phys):: &
     dx1,xland1,ps1,ts1,qsfc1,ust1,ch1,hfx1,qfx1, &
     wspd1,uoce1,voce1,znt1
 
  real(kind_phys),dimension(kts:kte):: &
-    dz1,u1,v1,th1,tk1,p1,exner1,rho1,qv1,rthraten1
+    dz1,u1,v1,th1,tk1,p1,exner1,rho1,qv1,rthraten1,delp1
 
  real(kind_phys),dimension(kts:kme):: &
     w1
@@ -385,9 +389,11 @@
  logical, parameter:: debug = .false.
 
 #if ((EM_CORE == 1) || defined(mpas))
- logical, parameter :: dry_mixing_ratio = .true.
+ logical, parameter:: dry_mixing_ratio = .true.
+ logical, parameter:: neg_moist_check  = .false.
 #else
- logical, parameter :: dry_mixing_ratio = .false.
+ logical, parameter:: dry_mixing_ratio = .false.
+ logical, parameter:: neg_moist_check  = .true.
 #endif
 
  if (debug) then
@@ -440,36 +446,34 @@
     uoce1  = uoce(i,j)
     voce1  = voce(i,j)
     znt1   = znt(i,j)
-   !check for unearthly incoming surface fluxes. These threshold are only surpassed
-   !when something unphysical is happening. If these limits are being surpassed,
-   !conservation is already questionable and the simulation is heading off the rails. 
-   !Try to curb the consequences of this behavior by imposing liberal limits on
-   !the incoming fluxes:
-   hfx1 = hfx(i,j)
-   if (hfx1 > 1200.) then
-      !print*,"hfx at i=",i," j=",j,"is unrealistic:",hfx1
-      hfx1 = 1200._kind_phys
-   endif
-   if (hfx1 < -600.) then
-      !print*,"hfx at i=",i," j=",j,"is unrealistic:",hfx1
-      hfx1 = -600._kind_phys
-   endif
-   qfx1 = qfx(i,j)
-   if (qfx1 > 9e-4) then
-      !print*,"qfx at i=",i," j=",j,"is unrealistic:",qfx1
-      qfx1 = 9e-4_kind_phys
-   endif
-   if (qfx1 < -3e-4) then
-      !print*,"qfx at i=",i," j=",j,"is unrealistic:",qfx1
-      qfx1 = -3e-4_kind_phys
-   endif
+    !check for unearthly incoming surface fluxes. These threshold are only surpassed
+    !when something unphysical is happening (or there is a fire). In this unphysical state,
+    !conservation is already questionable and the simulation is heading off the rails. 
+    !Try to curb the consequences of this behavior by imposing liberal limits on
+    !the incoming fluxes:
+    max_hfx = 1200._kind_phys
+    if (present(frp_mean)) then
+       if (frp_mean(i,j) > 10._kind_phys) max_hfx = 6000._kind_phys
+    endif
+    hfx1 = hfx(i,j)
+    if (hfx1 > max_hfx) then
+       !print*,"hfx at i=",i," j=",j,"is unrealistic:",hfx1
+       hfx1 = max_hfx
+    endif
+    if (hfx1 < -600.) then
+       !print*,"hfx at i=",i," j=",j,"is unrealistic:",hfx1
+       hfx1 = -600._kind_phys
+    endif
+    qfx1 = qfx(i,j)
+    if (qfx1 > 9e-4) then
+       !print*,"qfx at i=",i," j=",j,"is unrealistic:",qfx1
+       qfx1 = 9e-4_kind_phys
+    endif
+    if (qfx1 < -3e-4) then
+       !print*,"qfx at i=",i," j=",j,"is unrealistic:",qfx1
+       qfx1 = -3e-4_kind_phys
+    endif
    
-      !find/fix negative mixing ratios
-!      call moisture_check2(kte, delt,                 &
-!                           delp(i,:), exner(i,:,j),   &
-!                           qv(i,:,j), qc(i,:,j),      &
-!                           qi(i,:,j), t3d(i,:,j)      )
-
     do k = kts,kte
        dz1(k)       = dz(i,k,j)
        u1(k)        = u(i,k,j)
@@ -480,8 +484,8 @@
        p1(k)        = p(i,k,j)
        exner1(k)    = exner(i,k,j)
        rho1(k)      = rho(i,k,j)
-       qv1(k)       = max(1e-10_kind_phys, qv(i,k,j))
        rthraten1(k) = rthraten(i,k,j)
+       delp1(k)     = max(0.01_kind_phys, pint(i,k,j)-pint(i,k+1,j))
     enddo
     w1(kte+1) = w(i,kte+1,j)
 
@@ -489,10 +493,11 @@
     !    for the ozone mixing ratio; input arguments for aerosols from the aerosol-aware
     !    Thompson cloud microphysics:
     do k = kts,kte
-       qc1(k)   = zero
-       qi1(k)   = zero
-       qs1(k)   = zero
-       qoz1(k)  = zero
+       qv1(k)    = max(1e-10_kind_phys, qv(i,k,j))
+       qc1(k)    = zero
+       qi1(k)    = zero
+       qs1(k)    = zero
+       qoz1(k)   = zero
        qnc1(k)   = zero
        qni1(k)   = zero
        qnifa1(k) = zero
@@ -545,6 +550,27 @@
        enddo
     endif
 
+    do k = kts,kte
+       rqcblten1(k)    = zero
+       rqiblten1(k)    = zero
+       rqsblten1(k)    = zero
+       rqozblten1(k)   = zero
+       rqncblten1(k)   = zero
+       rqniblten1(k)   = zero
+       rqnifablten1(k) = zero
+       rqnwfablten1(k) = zero
+       rqnbcablten1(k) = zero
+    enddo
+    
+    if (neg_moist_check .and. present(qi) .and. present(qc)) then
+       !find/fix negative mixing ratios
+       call moisture_check2(kte        , delt       , delp1      , exner1     , &
+                            qv1        , qc1        , qi1        , th1          )
+       do k = kts,kte
+          tk1(k)    = th1(k)*exner1(k)
+       enddo
+    endif
+    
     !--- conversion from mixing ratios to specific contents:
     if (dry_mixing_ratio) then
        call mynnedmf_pre_run(kte,f_qc,f_qi,f_qs,qv1,qc1,qi1,qs1,sqv1,sqc1, &
@@ -625,17 +651,6 @@
     endif
     scalars     = zero
 
-    do k = kts,kte
-       rqcblten1(k)   = zero
-       rqiblten1(k)   = zero
-       rqsblten1(k)   = zero
-       rqozblten1(k)  = zero
-       rqncblten1(k)   = zero
-       rqniblten1(k)   = zero
-       rqnifablten1(k) = zero
-       rqnwfablten1(k) = zero
-       rqnbcablten1(k) = zero
-    enddo
 
     if (debug) then
       print*,"In mynnedmf driver, just before the call to mynnedmf"
@@ -650,6 +665,7 @@
             sqc1            = sqc1          , sqi1        = sqi1          , sqs1        = sqs1         , &
             qnc1            = qnc1          , qni1        = qni1          , qnwfa1      = qnwfa1       , &
             qnifa1          = qnifa1        , qnbca1      = qnbca1        , ozone1      = qoz1         , &
+            delp1           = delp1         ,                                                            &
             pres1           = p1            , ex1         = exner1        , rho1        = rho1         , &
             tk1             = tk1           , xland       = xland1        , ts          = ts1          , &
             qsfc            = qsfc1         , ps          = ps1           , ust         = ust1         , &
@@ -670,9 +686,9 @@
             edmf_a1         = edmf_a1       , edmf_w1     = edmf_w1       , edmf_qt1    = edmf_qt1     , &
             edmf_thl1       = edmf_thl1     , edmf_ent1   = edmf_ent1     , edmf_qc1    = edmf_qc1     , &
             sub_thl1        = sub_thl1      , sub_sqv1    = sub_sqv1      , det_thl1    = det_thl1     , &
-            det_sqv1        = det_sqv1       ,                                                           &
+            det_sqv1        = det_sqv1      ,                                                            &
             maxwidth        = maxwidth1     , maxmf       = maxmf1        , ztop_plume  = ztop_plume1  , &
-            excess_h        = excess_h1      , excess_q    = excess_q1      , maxwidth_dd = maxwidth_dd1 , &
+            excess_h        = excess_h1     , excess_q    = excess_q1     , maxwidth_dd = maxwidth_dd1 , &
             maxmf_dd        = maxmf_dd1     , maxtkeprod  =maxtkeprod1    , cldtop_cooling=cldtop_cooling1,&
             ent_eff         = ent_eff1      ,                                                            &
             flag_qc         = f_qc          , flag_qi     = f_qi          , flag_qs     = f_qs         , &
@@ -870,8 +886,8 @@ endif
  end subroutine mynnedmf_driver
 
 ! ==================================================================
- subroutine moisture_check2(kte, delt, dp, exner, &
-                             qv, qc, qi, th        )
+ subroutine moisture_check2(kte,  delt,    dp, exner, &
+                             qv,    qc,    qi,    th  )
   !
   ! If qc < qcmin, qi < qimin, or qv < qvmin happens in any layer,
   ! force them to be larger than minimum value by (1) condensating 
@@ -907,11 +923,11 @@ endif
        qi(k)  = qi(k)  +  dqi2
        qv(k)  = qv(k)  -  dqc2 - dqi2
        !for theta
-       !th(k)  = th(k)  +  xlvcp/exner(k)*dqc2 + &
-       !                   xlscp/exner(k)*dqi2
+       th(k)  = th(k)  +  xlvcp/exner(k)*dqc2 + &
+                          xlscp/exner(k)*dqi2
        !for temperature
-       th(k)  = th(k)  +  xlvcp*dqc2 + &
-                          xlscp*dqi2
+       !th(k)  = th(k)  +  xlvcp*dqc2 + &
+       !                   xlscp*dqi2
 
        !then fix qv if lending qv made it negative
        if (k .eq. 1) then
