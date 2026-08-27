@@ -51,7 +51,7 @@ module module_bl_mynnedmf_tests
     subroutine mynnedmf_test(case,bl_mynn_closure,bl_mynn_cloudpdf,bl_mynn_mixlength,      &
         bl_mynn_edmf,bl_mynn_edmf_dd,bl_mynn_edmf_mom,bl_mynn_edmf_tke,bl_mynn_cloudmix,   &
         bl_mynn_mixqt, bl_mynn_mixscalars, bl_mynn_mixaerosols,bl_mynn_mixnumcon,          &
-        bl_mynn_ess,tke_budget,bl_mynn_diags, restart_in,                                  &
+        bl_mynn_ess, tke_budget, bl_mynn_diags, mix_chem, enh_mix, restart_in,             &
         t_start_in, t_end_in, u, v, th, qv, qc, qi,                                        &
         rublten, rvblten, rthblten, rqvblten, rqcblten, rqiblten,                          &
         qc_bl, qi_bl, cldfra_bl, el_pbl, qke, qsq, tsq, cov,                               &
@@ -63,7 +63,7 @@ module module_bl_mynnedmf_tests
         integer :: ncid, varid
         integer :: dimid_time, dimid_z
         integer :: nt, nz
-        integer :: t, t_start, t_end
+        integer :: t, t_start, t_end, k
         integer :: status
         integer :: ims,ime,kms,kme,jms,jme
         integer :: ids,ide,kds,kde,jds,jde
@@ -125,11 +125,12 @@ module module_bl_mynnedmf_tests
         real, allocatable :: u_loc(:,:,:),v_loc(:,:,:), w_loc(:,:,:), th_loc(:,:,:), t3d_loc(:,:,:),& 
                 p_loc(:,:,:), exner_loc(:,:,:), rho_loc(:,:,:), qv_loc(:,:,:), qc_loc(:,:,:),       &
                 qi_loc(:,:,:), dz_loc(:,:,:), exch_h_loc(:,:,:), exch_m_loc(:,:,:),                 &
-                pattern_spp_pbl(:,:,:)
+                pattern_spp_pbl(:,:,:), pint(:,:,:)
         real, allocatable ::  rthraten_loc(:,:,:), rublten_loc(:,:,:), rvblten_loc(:,:,:), rthblten_loc(:,:,:)        
         
         !optional CHEM arrays
-        real, allocatable ::  chem3d(:,:,:,:), settle3d(:,:,:,:), vd3d(:,:,:) 
+        real, allocatable ::  chem3d(:,:,:,:), settle3d(:,:,:,:), vd3d(:,:,:)
+        real, allocatable ::  frp_mean(:,:)  , emis_ant_no(:,:)
         
         !optional and output 3D arrays
         real, allocatable :: qc_bl_loc(:,:,:), qi_bl_loc(:,:,:), cldfra_bl_loc(:,:,:)
@@ -145,9 +146,10 @@ module module_bl_mynnedmf_tests
         real, allocatable :: det_sqv3d_loc(:,:,:),dqke_loc(:,:,:),edmf_a_loc(:,:,:),edmf_ent_loc(:,:,:),        &
                 edmf_qc_loc(:,:,:), edmf_qt_loc(:,:,:),edmf_thl_loc(:,:,:),edmf_w_loc(:,:,:),det_thl3d_loc(:,:,:)
 
-        !smoke/dust parameters
-        logical,parameter::mix_chem=.false.
-        integer,parameter::nchem=1,ndvel=1
+        !smoke/dust configurations
+        logical, intent(in), optional:: mix_chem
+        logical, intent(in), optional:: enh_mix
+        integer,parameter:: nchem=1,ndvel=1
 
         !ccpp obligation
         character::errmsg
@@ -265,6 +267,7 @@ module module_bl_mynnedmf_tests
         allocate(th_loc(ims:ime, kms:kme, jms:jme))
         allocate(t3d_loc(ims:ime, kms:kme, jms:jme))
         allocate(p_loc(ims:ime, kms:kme, jms:jme))
+        allocate(pint(ims:ime, kms:kme, jms:jme))
         allocate(exner_loc(ims:ime, kms:kme, jms:jme))
         allocate(rho_loc(ims:ime, kms:kme, jms:jme))
         allocate(qv_loc(ims:ime, kms:kme, jms:jme))
@@ -311,6 +314,14 @@ module module_bl_mynnedmf_tests
         allocate(RQVBLTEN_loc(ims:ime, kms:kme, jms:jme))
         allocate(RQCBLTEN_loc(ims:ime, kms:kme, jms:jme))
         allocate(RQIBLTEN_loc(ims:ime, kms:kme, jms:jme)) 
+
+        ! allocate psudo smoke/chem test arrays
+        allocate(chem3d(ims:ime, kms:kme, jms:jme, 1:nchem))
+        allocate(settle3d(ims:ime, kms:kme, jms:jme, 1:nchem))
+        allocate(vd3d(ims:ime, kms:kme, jms:jme))
+        allocate(frp_mean(ims:ime, jms:jme))
+        allocate(emis_ant_no(ims:ime, jms:jme))
+
 
         ! Read time variable
         status = nf90_inq_varid(ncid, "Times", varid)
@@ -475,7 +486,14 @@ module module_bl_mynnedmf_tests
 
             status = nf90_inq_varid(ncid, "PTOTAL", varid)
             status = nf90_get_var(ncid, varid, p_loc(1,:,1), &
-                                  start=[1,1,1,t], count=[1,1,nz,1])
+                 start=[1,1,1,t], count=[1,1,nz,1])
+
+            !calculate p on interfaces:
+            pint(:,1,:) = ps
+            do k=kts+1,nz
+               pint(:,k,:) = p_loc(:,k,:) - p_loc(:,k+1,:)
+            enddo
+            pint(:,kme,:) = pint(:,kme-1,:)-1.
 
             status = nf90_inq_varid(ncid, "EXNER", varid)
             status = nf90_get_var(ncid, varid, exner_loc(1,:,1), &
@@ -491,6 +509,15 @@ module module_bl_mynnedmf_tests
             status = nf90_inq_varid(ncid, "EXCH_M_mass", varid)
             status = nf90_get_var(ncid, varid, exch_m_loc(1,:,1), &
                                   start=[1,1,1,t], count=[1,1,nz,1])
+
+            ! assign pseudo smoke/chem data
+            frp_mean         = 1.0
+            emis_ant_no      = 5.0e-9
+            vd3d(1, 1, 1)    = 0.01
+            vd3d(1, 2:nz, 1) = 1.0e-4
+            chem3d           = 1.0e-9
+            settle3d         = 0.001
+
 
            print *, 'before mynnedmf_driver'
 
@@ -508,9 +535,10 @@ module module_bl_mynnedmf_tests
                   qfx=qfx              , wspd=wspd           , znt=znt             ,                      &
                   uoce=uoce            , voce=voce           , dz=dz_loc               , u=u_loc                        , &
                   v=v_loc                  , w=w_loc                 , th=th_loc               , tk=t3d_loc             , &
-                  p=p_loc                  , exner=exner_loc         , rho=rho_loc             , qv=qv_loc              , &
+                  p=p_loc                  , pint=pint               , exner=exner_loc         , rho=rho_loc            , &
+                  qv=qv_loc                ,                                                                              &
                   qc=qc_loc                , qi=qi_loc               , qs=qs_loc               , qnc=qnc_loc            , &
-                  qni=qni_loc              , qnifa=qnifa_loc         , qnwfa=qnwfa_loc         ,qnbca=qnbca_loc         , &
+                  qni=qni_loc              , qnifa=qnifa_loc         , qnwfa=qnwfa_loc         , qnbca=qnbca_loc        , &
 !                  qoz=qoz              ,                                                                  &
                   rthraten=rthraten_loc    , pblh=pblh_loc           , kpbl=kpbl           , maxwidth_dd=maxwidth_dd    , &
                   cldfra_bl=cldfra_bl_loc  , qc_bl=qc_bl_loc         , qi_bl=qi_bl_loc          , maxwidth=maxwidth     , &
@@ -544,7 +572,7 @@ module module_bl_mynnedmf_tests
                   mix_chem=mix_chem     , chem3d=chem3d         , vd3d=vd3d     , nchem=nchem           , &
                   ndvel=ndvel           ,                                                                 &
                   settle3d=settle3d     ,                                                                 &
-!                  frp_mean=frp_mean    , emis_ant_no=emis_ant_no       , enh_mix=enh_mix               , &
+                  frp_mean=frp_mean    , emis_ant_no=emis_ant_no       , enh_mix=enh_mix               , &
 !#endif
                   errmsg=errmsg        , errflg=errflg                                                    &
                   )
@@ -670,7 +698,7 @@ module module_bl_mynnedmf_tests
         
         ! deallocate 3D arrays
         deallocate(u_loc, v_loc, w_loc, th_loc, t3d_loc, p_loc, exner_loc, rho_loc,   &
-                    qv_loc, qc_loc, qi_loc, dz_loc, exch_h_loc, exch_m_loc)
+                    qv_loc, qc_loc, qi_loc, dz_loc, exch_h_loc, exch_m_loc, pint)
         deallocate(cov_loc, det_thl3d_loc, det_sqv3d_loc, dqke_loc, edmf_a_loc,       &
                     edmf_ent_loc, edmf_qc_loc, edmf_qt_loc, edmf_thl_loc, edmf_w_loc, &
                     qnc_loc, qni_loc, qnwfa_loc, qnifa_loc, qs_loc, qshear_loc,       &
