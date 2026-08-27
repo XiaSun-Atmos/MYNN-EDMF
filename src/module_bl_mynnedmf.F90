@@ -164,6 +164,7 @@ contains
              qni1               , qnwfa1            , qnifa1            , &
              qnbca1             , ozone1            , pres1             , &
              ex1                , rho1              , tk1               , &
+             delp1              ,                                         &
              !2d surface fields
              xland              , ts                , qsfc              , &
              ps                 , ust               , ch                , &
@@ -276,7 +277,7 @@ contains
 
 !column variables (all end with a "1")
  real(kind_phys), dimension(kts:kte), intent(in)      ::            &
-       dz1,u1,v1,w1,th1,pres1,ex1,rho1,tk1,rthraten1
+       dz1,u1,v1,w1,th1,pres1,ex1,delp1,rho1,tk1,rthraten1
  real(kind_phys), dimension(kts:kte), intent(inout)   ::            &
        sqv1,sqc1,sqi1,sqs1,qni1,qnc1,qnwfa1,qnifa1,qnbca1,ozone1,   &
        qke1,tsq1,qsq1,cov1,qke_adv1,                                &
@@ -822,7 +823,8 @@ contains
     maxmf_dd       = zero
     maxwidth_dd    = zero
     if (bl_mynn_edmf_dd > 0) then
-       call ddmp_mf(kts,kte,delt,dx,zw1,dz1,pres1,    &
+       call ddmp_mf(kts,kte,delt,dx,                  &
+            zw1,dz1,pres1,delp1,                      &
             &u1,v1,th1,thl1,thv1,tk1,                 &
             &sqw1,sqv1,sqc1,sqi1,qnc1,qni1,           &
             &qnwfa1,qnifa1,                           &
@@ -917,7 +919,7 @@ contains
 !>  - Call mynn_tendencies() to solve for tendencies of 
 !! \f$U, V, \theta, q_{v}, q_{c}, and q_{i}\f$.
     call mynn_tendencies(kts,kte,i,                      &
-            &delt, dz1, zw1, xland, pblh, rho1,          &
+            &delt, dz1, zw1, xland, pblh, rho1, delp1,   &
             &u1, v1, th1, tk1, qv1,                      &
             &qc1, qi1, kzero1, qnc1, qni1,               & !kzero replaces qs1 - not mixing snow
             &ps, pres1, ex1, thl1,                       &
@@ -3918,7 +3920,7 @@ endif
 !! This subroutine solves for tendencies of U, V, \f$\theta\f$, qv,
 !! qc, and qi
   SUBROUTINE mynn_tendencies(kts,kte,i,       &
-       &delt,dz,zw,xland,pblh,rho,            &
+       &delt,dz,zw,xland,pblh,rho,delp,       &
        &u,v,th,tk,qv,qc,qi,qs,qnc,qni,        &
        &psfc,p,exner,                         &
        &thl,sqv,sqc,sqi,sqs,sqw,              &
@@ -3963,7 +3965,7 @@ endif
 !-------------------------------------------------------------------
     use module_bl_mynnedmf_common, only: r_d,p608,grav,xlvcp,xlscp,       &
          wfa_max,wfa_min,ifa_max,ifa_min,wfa_ht,ifa_ht,zero,one,          &
-         p333,p5,kind_phys
+         p25,p333,p5,kind_phys
     
     integer, intent(in) :: kts,kte,i
 
@@ -3995,7 +3997,7 @@ endif
     real(kind_phys), dimension(kts:kte), intent(in) :: sub_thl,sub_sqv,   &
          &sub_u,sub_v,det_thl,det_sqv,det_sqc,det_u,det_v
     real(kind_phys), dimension(kts:kte), intent(in) :: u,v,th,tk,qv,qc,qi,&
-         &qs,qni,qnc,rho,p,exner,dfq,dz,zw,tsq,qsq,cov,tcd,qcd,           &
+         &qs,qni,qnc,rho,p,delp,exner,dfq,dz,zw,tsq,qsq,cov,tcd,qcd,      &
          &cldfra_bl1,diss_heat,thl_tot1,qc_tot1,qi_tot1
     real(kind_phys), dimension(kts:kte), intent(inout) :: thl,sqw,sqv,sqc,&
          &sqi,sqs,qnwfa,qnifa,qnbca,ozone,dfm,dfh
@@ -4012,7 +4014,7 @@ endif
 
 !local vars
 
-    real(kind_phys), dimension(kts:kte) :: dtz,dfhc,dfmc,delp
+    real(kind_phys), dimension(kts:kte) :: dtz,dfhc,dfmc
     real(kind_phys), dimension(kts:kte) :: sqv2,sqc2,sqi2,sqs2,sqw2,      &
           &qni2,qnc2,qnwfa2,qnifa2,qnbca2,ozone2
     real(kind_phys), dimension(kts:kte) :: zfac,plumeKh,rhoinv
@@ -4074,13 +4076,13 @@ endif
 
     !delta-p for the moisture check
     !delp(kts)  = psfc - (p(kts+1)*dz(kts) + p(kts)*dz(kts+1))/(dz(kts)+dz(kts+1))
-    DO k=kts,kte !kts+1,kte-1
-       !delp(k)  = (p(k)*dz(k-1) + p(k-1)*dz(k))/(dz(k)+dz(k-1)) - &
-       !           (p(k+1)*dz(k) + p(k)*dz(k+1))/(dz(k)+dz(k+1))
-       delp(k) = rho(k)*grav*dz(k)
-    ENDDO
-    !delp(kte)  =delp(kte-1)
-    if ( delp(kts) < p333*delp(kts+1) )delp(kts)=p333*delp(kts+1)
+!    DO k=kts,kte !kts+1,kte-1
+!       !delp(k)  = (p(k)*dz(k-1) + p(k-1)*dz(k))/(dz(k)+dz(k-1)) - &
+!       !           (p(k+1)*dz(k) + p(k)*dz(k+1))/(dz(k)+dz(k+1))
+!       delp(k) = rho(k)*grav*dz(k)
+!    ENDDO
+!    !delp(kte)  =delp(kte-1)
+!    if ( delp(kts) < p25*delp(kts+1) )delp(kts)=p25*delp(kts+1)
 
     !stability criteria for implicit mf
     if (bl_mynn_edmf == 1) then
@@ -7733,7 +7735,7 @@ end subroutine condensation_edmf_r
 ! 7) mixes aerosols
 ! 8) revised the conection to the solver
 
-subroutine ddmp_mf(kts,kte,dt,dx,zw,dz,p,            &
+subroutine ddmp_mf(kts,kte,dt,dx,zw,dz,p,delp,       &
               &u,v,th,thl,thv,tk,qt,qv,qc,qi,        &
               &qnc,qni,qnwfa,qnifa,                  &
               &qke,rho,exner,                        &
@@ -7756,7 +7758,7 @@ subroutine ddmp_mf(kts,kte,dt,dx,zw,dz,p,            &
 
         integer, intent(in) :: kts,kte,kpbl
         real(kind_phys), dimension(kts:kte), intent(in) ::            &
-            u,v,th,thl,tk,qt,qv,qc,qi,thv,p,qke,rho,exner,            &
+            u,v,th,thl,tk,qt,qv,qc,qi,thv,p,delp,qke,rho,exner,       &
             qnc,qni,qnwfa,qnifa,dz,qc_bl1,qi_bl1,cldfra_bl1,el
         real(kind_phys), dimension(kts:kte), intent(in) :: rthraten
         ! zw .. heights of the downdraft levels (edges of boxes)
@@ -7920,7 +7922,8 @@ subroutine ddmp_mf(kts,kte,dt,dx,zw,dz,p,            &
       f0 = zero
       do k = max(kmin,qltop-2), qltop+1
          radflux = rthraten(k) * exner(k)     ! converts theta/s to temperature/s
-         dp      = p5 * (( p(k) - p(k+1) ) + ( p(k-1) - p(k) ))
+         !dp      = p5 * (( p(k) - p(k+1) ) + ( p(k-1) - p(k) ))
+         dp      = delp(k)
          radflux = radflux * cp / grav * dp   ! converts k/s to w/m^2
          if ( radflux < zero ) f0 = abs(radflux) + f0
       enddo

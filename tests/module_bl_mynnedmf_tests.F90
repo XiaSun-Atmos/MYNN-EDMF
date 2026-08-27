@@ -63,7 +63,7 @@ module module_bl_mynnedmf_tests
         integer :: ncid, varid
         integer :: dimid_time, dimid_z
         integer :: nt, nz
-        integer :: t, t_start, t_end
+        integer :: t, t_start, t_end, k
         integer :: status
         integer :: ims,ime,kms,kme,jms,jme
         integer :: ids,ide,kds,kde,jds,jde
@@ -121,7 +121,7 @@ module module_bl_mynnedmf_tests
         real, allocatable :: u_loc(:,:,:),v_loc(:,:,:), w_loc(:,:,:), th_loc(:,:,:), t3d_loc(:,:,:),& 
                 p_loc(:,:,:), exner_loc(:,:,:), rho_loc(:,:,:), qv_loc(:,:,:), qc_loc(:,:,:),       &
                 qi_loc(:,:,:), dz_loc(:,:,:), exch_h_loc(:,:,:), exch_m_loc(:,:,:),                 &
-                pattern_spp_pbl(:,:,:)
+                pattern_spp_pbl(:,:,:), pint(:,:,:)
         real, allocatable ::  rthraten_loc(:,:,:), rublten_loc(:,:,:), rvblten_loc(:,:,:), rthblten_loc(:,:,:)        
         
         !optional CHEM arrays
@@ -254,6 +254,7 @@ module module_bl_mynnedmf_tests
         allocate(th_loc(ims:ime, kms:kme, jms:jme))
         allocate(t3d_loc(ims:ime, kms:kme, jms:jme))
         allocate(p_loc(ims:ime, kms:kme, jms:jme))
+        allocate(pint(ims:ime, kms:kme, jms:jme))
         allocate(exner_loc(ims:ime, kms:kme, jms:jme))
         allocate(rho_loc(ims:ime, kms:kme, jms:jme))
         allocate(qv_loc(ims:ime, kms:kme, jms:jme))
@@ -472,7 +473,14 @@ module module_bl_mynnedmf_tests
 
             status = nf90_inq_varid(ncid, "PTOTAL", varid)
             status = nf90_get_var(ncid, varid, p_loc(1,:,1), &
-                                  start=[1,1,1,t], count=[1,1,nz,1])
+                 start=[1,1,1,t], count=[1,1,nz,1])
+
+            !calculate p on interfaces:
+            pint(:,1,:) = ps
+            do k=kts+1,nz
+               pint(:,k,:) = p_loc(:,k,:) - p_loc(:,k+1,:)
+            enddo
+            pint(:,kme,:) = pint(:,kme-1,:)-1.
 
             status = nf90_inq_varid(ncid, "EXNER", varid)
             status = nf90_get_var(ncid, varid, exner_loc(1,:,1), &
@@ -512,11 +520,12 @@ module module_bl_mynnedmf_tests
                   dx=dx2d              , xland=xland         , ps=ps               , ts=ts              , &
                   qsfc=qsfc            , ust=ust             , ch=ch               , hfx=hfx            , &
                   qfx=qfx              , wspd=wspd           , znt=znt             ,                      &
-                  uoce=uoce            , voce=voce           , dz=dz_loc               , u=u_loc                , &
+                  uoce=uoce            , voce=voce           , dz=dz_loc           , u=u_loc            , &
                   v=v_loc                  , w=w_loc                 , th=th_loc               , tk=t3d_loc             , &
-                  p=p_loc                  , exner=exner_loc         , rho=rho_loc             , qv=qv_loc              , &
+                  p=p_loc                  , pint=pint               , exner=exner_loc         , rho=rho_loc            , &
+                  qv=qv_loc                ,                                                                              &
                   qc=qc_loc                , qi=qi_loc               , qs=qs_loc               , qnc=qnc_loc            , &
-                  qni=qni_loc              , qnifa=qnifa_loc         , qnwfa=qnwfa_loc         ,qnbca=qnbca_loc         , &
+                  qni=qni_loc              , qnifa=qnifa_loc         , qnwfa=qnwfa_loc         , qnbca=qnbca_loc        , &
 !                  qoz=qoz              ,                                                                  &
                   rthraten=rthraten_loc    , pblh=pblh_loc           , kpbl=kpbl           , maxwidth_dd=maxwidth_dd,&
                   cldfra_bl=cldfra_bl_loc  , qc_bl=qc_bl_loc         , qi_bl=qi_bl_loc          , maxwidth=maxwidth , &
@@ -667,7 +676,7 @@ module module_bl_mynnedmf_tests
         
         ! deallocate 3D arrays
         deallocate(u_loc, v_loc, w_loc, th_loc, t3d_loc, p_loc, exner_loc, rho_loc,   &
-                    qv_loc, qc_loc, qi_loc, dz_loc, exch_h_loc, exch_m_loc)
+                    qv_loc, qc_loc, qi_loc, dz_loc, exch_h_loc, exch_m_loc, pint)
         deallocate(cov_loc, det_thl3d_loc, det_sqv3d_loc, dqke_loc, edmf_a_loc,       &
                     edmf_ent_loc, edmf_qc_loc, edmf_qt_loc, edmf_thl_loc, edmf_w_loc, &
                     qnc_loc, qni_loc, qnwfa_loc, qnifa_loc, qs_loc, qshear_loc,       &
