@@ -63,7 +63,7 @@ module module_bl_mynnedmf_tests
         integer :: ncid, varid
         integer :: dimid_time, dimid_z
         integer :: nt, nz
-        integer :: t, t_start, t_end
+        integer :: t, t_start, t_end, k
         integer :: status
         integer :: ims,ime,kms,kme,jms,jme
         integer :: ids,ide,kds,kde,jds,jde
@@ -467,9 +467,10 @@ module module_bl_mynnedmf_tests
 
             !calculate p on interfaces:
             pint(:,1,:) = ps
-            do k=kts,kms
+            do k=kts+1,nz
                pint(:,k,:) = p_loc(:,k,:) - p_loc(:,k+1,:)
             enddo
+            pint(:,kme,:) = pint(:,kme-1,:)-1.
 
             status = nf90_inq_varid(ncid, "EXNER", varid)
             status = nf90_get_var(ncid, varid, exner_loc(1,:,1), &
