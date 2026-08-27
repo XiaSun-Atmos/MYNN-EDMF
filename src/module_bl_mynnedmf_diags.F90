@@ -25,7 +25,7 @@ module module_bl_mynnedmf_diags
     real(kind_phys), dimension(kts:kte), intent(in), optional :: qc_bl1, qi_bl1,   &
                        cldfra_bl1 
     real(kind_phys), dimension(kts:kte) :: qctotal1, qitotal1, qstotal1
-    real(kind_phys), intent(out)  , optional :: lwp1, iwp1, swp1
+    real(kind_phys), intent(inout), optional :: lwp1, iwp1, swp1
     real(kind_phys), intent(out)  , optional :: cldceil1, wspd101, wspd801, wspd1601
 
     integer :: k
