@@ -364,7 +364,9 @@
     wspd1,uoce1,voce1,znt1
 
  real(kind_phys),dimension(kts:kte):: &
-    dz1,u1,v1,th1,tk1,p1,exner1,rho1,qv1,rthraten1,delp1
+    dz1,u1,v1,th1,tk1,p1,exner1,rho1,qv1,rthraten1,delp1,zagl1
+
+ real(kind_phys),dimension(kts:kte+1):: zw1
 
  real(kind_phys),dimension(kts:kme):: &
     w1
@@ -492,7 +494,9 @@
        !print*,"qfx at i=",i," j=",j,"is unrealistic:",qfx1
        qfx1 = -3e-4_kind_phys
     endif
-   
+
+    zw1(kts)        = zero
+    zagl1(kts)      = zero
     do k = kts,kte
        dz1(k)       = dz(i,k,j)
        u1(k)        = u(i,k,j)
@@ -505,6 +509,8 @@
        rho1(k)      = rho(i,k,j)
        rthraten1(k) = rthraten(i,k,j)
        delp1(k)     = max(0.01_kind_phys, pint(i,k,j)-pint(i,k+1,j))
+       zagl1(k)     = zw1(k) + 0.5_kind_phys * dz1(k)                   ! at mass point AGL
+       zw1(k+1)     = zw1(k) + dz1(k)                                   ! at interface
     enddo
     w1(kte+1) = w(i,kte+1,j)
 
@@ -684,7 +690,7 @@
             sqc1            = sqc1          , sqi1        = sqi1          , sqs1        = sqs1         , &
             qnc1            = qnc1          , qni1        = qni1          , qnwfa1      = qnwfa1       , &
             qnifa1          = qnifa1        , qnbca1      = qnbca1        , ozone1      = qoz1         , &
-            delp1           = delp1         ,                                                            &
+            delp1           = delp1         , zw1         = zw1           , zagl1       = zagl1        , &
             pres1           = p1            , ex1         = exner1        , rho1        = rho1         , &
             tk1             = tk1           , xland       = xland1        , ts          = ts1          , &
             qsfc            = qsfc1         , ps          = ps1           , ust         = ust1         , &
@@ -895,7 +901,8 @@
 
     if (bl_mynn_diags >= 1) then
        call mynnedmf_diags (&
-               kts  = kts , kte    = kte    , delp1      = delp1     , dz1  =  dz1  , u1     = u1       ,&
+               kts  = kts , kte    = kte    , delp1      = delp1     , dz1  =  dz1  , zw1 = zw1         ,&
+               zagl1=zagl1, u1     = u1     ,                                                            &
                v1   = v1  , tk1    = tk1    , qc1        = qc1       , qi1  =  qi1                      ,&
                qs1  = qs1 , qc_bl1 = qc_bl1 , qi_bl1     = qi_bl1    , cldfra_bl1 = cldfra_bl1          ,&        
                rho1 = rho , xland1 = xland1 , pblh1      = pblh1     ,                                   &

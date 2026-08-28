@@ -13,8 +13,8 @@ module module_bl_mynnedmf_diags
 ! Subroutine to call MYNN-EDMF diagnostics
 !===================================================================
   subroutine mynnedmf_diags (&
-                kts     , kte    , delp1     , dz1 , u1    , v1   , tk1 , qc1 , qi1 , qs1      ,&
-                qc_bl1  , qi_bl1 , cldfra_bl1, rho1, xland1, pblh1, lwp1, iwp1, swp1, cldceil1 ,&
+                kts     , kte    , delp1     , dz1 , zw1   , zagl1, u1  , v1  , tk1 , qc1 , qi1 , qs1,&
+                qc_bl1  , qi_bl1 , cldfra_bl1, rho1, xland1, pblh1, lwp1, iwp1, swp1, cldceil1       ,&
                 wspd101 , wspd801, wspd1601  , maxcldfra1  , maxcldfra_pbl1   , bl_mynn_diags  )
 
     implicit none
@@ -22,26 +22,18 @@ module module_bl_mynnedmf_diags
     integer, intent(in) :: kts, kte
     integer, intent(in) :: bl_mynn_diags
     real(kind_phys), intent(in) :: xland1, pblh1
-    real(kind_phys), dimension(kts:kte), intent(in) :: delp1, dz1, u1, v1, tk1, qc1, &
+    real(kind_phys), dimension(kts:kte), intent(in) :: delp1, dz1, zagl1, u1, v1, tk1, qc1, &
                        qi1, qs1, rho1
+    real(kind_phys), dimension(kts:kte+1), intent(in) :: zw1
     real(kind_phys), dimension(kts:kte), intent(in), optional :: qc_bl1, qi_bl1,     &
                        cldfra_bl1 
-    real(kind_phys), dimension(kts:kte) :: qctotal1, qitotal1, qstotal1, zagl1
-    real(kind_phys), dimension(kts:kte+1) :: zw1
+    real(kind_phys), dimension(kts:kte) :: qctotal1, qitotal1, qstotal1
     real(kind_phys), intent(inout), optional :: lwp1, iwp1, swp1, maxcldfra1, maxcldfra_pbl1
     real(kind_phys), intent(out)  , optional :: cldceil1, wspd101, wspd801, wspd1601
 
     integer :: k
-    real(kind_phys) :: zagl0
-
-    zw1(kts)   = zero
-    zagl1(kts) = zero
 
     do k = kts, kte
-      zagl0 = zagl1(k)
-      zagl1(k) = zw1(k) + 0.5_kind_phys * dz1(k)  ! at mass point AGL
-      zw1(k+1) = zw1(k) + dz1(k)     ! at interface
-
       if (qc1(k)<1e-6 .and. cldfra_bl1(k)>0.01) then
         qctotal1(k) = qc_bl1(k)
       else
@@ -113,7 +105,7 @@ module module_bl_mynnedmf_diags
     integer, intent(in) :: kts, kte
     real(kind_phys), dimension(kts:kte), intent(in) :: zagl1, u1, v1
 
-    real(kind_phys) :: depth, zagl0
+    real(kind_phys) :: depth
 
     real(kind_phys), intent(out) :: wspd101, wspd801, wspd1601
     integer :: k
