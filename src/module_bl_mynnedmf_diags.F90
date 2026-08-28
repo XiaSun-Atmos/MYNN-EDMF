@@ -12,25 +12,36 @@ module module_bl_mynnedmf_diags
 !===================================================================
 ! Subroutine to call MYNN-EDMF diagnostics
 !===================================================================
-  subroutine mynnedmf_diags (kts, kte, p1, dz1, u1, v1, tk1, qc1, qi1, qs1,        &
-                qc_bl1, qi_bl1, cldfra_bl1, rho1, xland1, lwp1, iwp1, swp1,        &
-                cldceil1, wspd101, wspd801, wspd1601, bl_mynn_diags)
+  subroutine mynnedmf_diags (&
+                kts     , kte    , delp1     , dz1 , u1    , v1   , tk1 , qc1 , qi1 , qs1      ,&
+                qc_bl1  , qi_bl1 , cldfra_bl1, rho1, xland1, pblh1, lwp1, iwp1, swp1, cldceil1 ,&
+                wspd101 , wspd801, wspd1601  , maxcldfra1  , maxcldfra_pbl1   , bl_mynn_diags  )
+
     implicit none
 
     integer, intent(in) :: kts, kte
     integer, intent(in) :: bl_mynn_diags
-    real(kind_phys), intent(in) :: xland1
-    real(kind_phys), dimension(kts:kte), intent(in) :: p1, dz1, u1, v1, tk1, qc1,  &
+    real(kind_phys), intent(in) :: xland1, pblh1
+    real(kind_phys), dimension(kts:kte), intent(in) :: delp1, dz1, u1, v1, tk1, qc1, &
                        qi1, qs1, rho1
-    real(kind_phys), dimension(kts:kte), intent(in), optional :: qc_bl1, qi_bl1,   &
+    real(kind_phys), dimension(kts:kte), intent(in), optional :: qc_bl1, qi_bl1,     &
                        cldfra_bl1 
-    real(kind_phys), dimension(kts:kte) :: qctotal1, qitotal1, qstotal1
-    real(kind_phys), intent(inout), optional :: lwp1, iwp1, swp1
+    real(kind_phys), dimension(kts:kte) :: qctotal1, qitotal1, qstotal1, zagl1
+    real(kind_phys), dimension(kts:kte+1) :: zw1
+    real(kind_phys), intent(inout), optional :: lwp1, iwp1, swp1, maxcldfra1, maxcldfra_pbl1
     real(kind_phys), intent(out)  , optional :: cldceil1, wspd101, wspd801, wspd1601
 
     integer :: k
+    real(kind_phys) :: zagl0
+
+    zw1(kts)   = zero
+    zagl1(kts) = zero
 
     do k = kts, kte
+      zagl0 = zagl1(k)
+      zagl1(k) = zw1(k) + 0.5_kind_phys * dz1(k)  ! at mass point AGL
+      zw1(k+1) = zw1(k) + dz1(k)     ! at interface
+
       if (qc1(k)<1e-6 .and. cldfra_bl1(k)>0.01) then
         qctotal1(k) = qc_bl1(k)
       else
@@ -46,14 +57,17 @@ module module_bl_mynnedmf_diags
       qstotal1(k) = qs1(k) !there currently is no sgs snow, it's ice+snow...
     end do
 
-    call cloud_water_path (kts, kte, p1, qctotal1, qitotal1, qstotal1,              &
+    call cloud_water_path (kts, kte, delp1, qctotal1, qitotal1, qstotal1,             &
           lwp1, iwp1, swp1)
 
-    call cloud_ceiling (kts, kte, dz1, tk1, qctotal1, qitotal1, qstotal1,           &
+    call cloud_ceiling (kts, kte, dz1, zagl1, zw1, tk1, qctotal1, qitotal1, qstotal1, &
           cldfra_bl1, rho1, xland1, cldceil1)
 
     if (bl_mynn_diags >= 2) then
-      call wspd_at_hgts (kts, kte, dz1, u1, v1, wspd101, wspd801, wspd1601)
+      call wspd_at_hgts (kts, kte, zagl1, u1, v1, wspd101, wspd801, wspd1601)
+
+      maxcldfra1     = maxval(cldfra_bl1)
+      maxcldfra_pbl1 = maxval(cldfra_bl1, mask=(zagl1 < (pblh1 + 1000._kind_phys)))
     endif
 
   end subroutine mynnedmf_diags
@@ -61,27 +75,26 @@ module module_bl_mynnedmf_diags
 !===================================================================
 ! Subroutine to calculate LWP, IWP, and SWP
 !===================================================================
-  subroutine cloud_water_path (kts, kte, p1, qctotal1, qitotal1, qstotal1,          &
+  subroutine cloud_water_path (kts, kte, delp1, qctotal1, qitotal1, qstotal1,        &
                 lwp1, iwp1, swp1)
     implicit none
 
     integer, intent(in) :: kts, kte
-    real(kind_phys), dimension(kts:kte), intent(in) :: p1, qctotal1, qitotal1, qstotal1
+    real(kind_phys), dimension(kts:kte), intent(in) :: delp1, qctotal1, qitotal1, qstotal1
     real(kind_phys), intent(inout), optional :: lwp1, iwp1, swp1
 
     ! local variables
-    real(kind_phys) :: dp, sum1, sum2, sum3
+    real(kind_phys) :: sum1, sum2, sum3
     integer :: k
 
     sum1=zero
     sum2=zero
     sum3=zero
 
-    do k = kts, kte-1
-      dp = p1(k) - p1(k+1)
-      sum1 = sum1 + max((dp * g_inv) * qctotal1(k), zero)
-      sum2 = sum2 + max((dp * g_inv) * qitotal1(k), zero)
-      sum3 = sum3 + max((dp * g_inv) * qstotal1(k), zero)
+    do k = kts, kte
+      sum1 = sum1 + max((delp1(k) * g_inv) * qctotal1(k), zero)
+      sum2 = sum2 + max((delp1(k) * g_inv) * qitotal1(k), zero)
+      sum3 = sum3 + max((delp1(k) * g_inv) * qstotal1(k), zero)
     enddo
 
     lwp1 = sum1 * 1000._kind_phys ! kg m-2  --> g m-2
@@ -94,46 +107,41 @@ module module_bl_mynnedmf_diags
 !===================================================================
 ! Subroutine to calculate wind speed at specific heights
 !===================================================================
-  subroutine wspd_at_hgts (kts, kte, dz1, u1, v1, wspd101, wspd801, wspd1601)
+  subroutine wspd_at_hgts (kts, kte, zagl1, u1, v1, wspd101, wspd801, wspd1601)
     implicit none
 
     integer, intent(in) :: kts, kte
-    real(kind_phys), dimension(kts:kte), intent(in) :: dz1, u1, v1
-    real(kind_phys), dimension(kts:kte) :: zw1
-    real(kind_phys) :: depth, z_agl0, z_agl
+    real(kind_phys), dimension(kts:kte), intent(in) :: zagl1, u1, v1
+
+    real(kind_phys) :: depth, zagl0
 
     real(kind_phys), intent(out) :: wspd101, wspd801, wspd1601
     integer :: k
 
-    zw1(kts)  = zero
-    z_agl     = zero
     wspd101   = -99._kind_phys
     wspd801   = -99._kind_phys
     wspd1601  = -99._kind_phys
     do k = kts, kte-1
-      z_agl0 = z_agl
-      z_agl = zw1(k) + 0.5_kind_phys * dz1(k)  ! at mass point AGL
-      zw1(k+1) = zw1(k) + dz1(k)     ! at interface
-      depth = z_agl - z_agl0
-      !print*, 'depth', depth,'z_agl',z_agl, 'wspd', sqrt(u1(k)**2+v1(k)**2)
+      depth = zagl1(k+1) - zagl1(k)
+      !print*, 'depth', depth,'zagl',zagl(k), 'wspd', sqrt(u1(k)**2+v1(k)**2)
 
       ! 10-m wind speed
-      if (z_agl > 10. .and. wspd101 == -99.) then
-        wspd101 = interpolate_wind (k, kts, 10.0, z_agl, u1(k), v1(k),            &
+      if (zagl1(k) > 10. .and. wspd101 == -99.) then
+        wspd101 = interpolate_wind (k, kts, 10.0, zagl1(k), u1(k), v1(k),            &
                     u1(k-1), v1(k-1), depth)
         ! print*, 'k', k, 'wspd10', wspd101
       endif
 
       ! 80-m wind speed
-      if (z_agl > 80. .and. wspd801 == -99.) then
-        wspd801 = interpolate_wind (k, kts, 80.0, z_agl, u1(k), v1(k),            &
+      if (zagl1(k) > 80. .and. wspd801 == -99.) then
+        wspd801 = interpolate_wind (k, kts, 80.0, zagl1(k), u1(k), v1(k),            &
                     u1(k-1), v1(k-1), depth)
         ! print*, 'k', k, 'wspd80', wspd801
       endif
 
       ! 160-m wind speed
-      if (z_agl > 160. .and. wspd1601 == -99.) then
-        wspd1601 = interpolate_wind (k, kts, 160.0, z_agl, u1(k), v1(k),          &
+      if (zagl1(k) > 160. .and. wspd1601 == -99.) then
+        wspd1601 = interpolate_wind (k, kts, 160.0, zagl1(k), u1(k), v1(k),          &
                     u1(k-1), v1(k-1), depth)
         ! print*, 'k', k, 'wspd160', wspd1601
       endif
@@ -145,16 +153,15 @@ module module_bl_mynnedmf_diags
 !===================================================================
 ! Subroutine to calculate cloud ceiling based on cloud optical depth
 !===================================================================
-  subroutine cloud_ceiling (kts, kte, dz1, tk1, qctotal1, qitotal1, qstotal1,       &
+  subroutine cloud_ceiling (kts, kte, dz1, zagl1, zw1, tk1, qctotal1, qitotal1, qstotal1,     &
                 cldfra_bl1, rho1, xland1, cldceil1)
     implicit none
 
     integer, intent(in) :: kts, kte
     real(kind_phys), intent(in) :: xland1
-    real(kind_phys), dimension(kts:kte), intent(in) :: dz1, tk1, rho1, cldfra_bl1
+    real(kind_phys), dimension(kts:kte), intent(in) :: dz1, zagl1, zw1, tk1, rho1, cldfra_bl1
     real(kind_phys), dimension(kts:kte), intent(in) :: qctotal1, qitotal1, qstotal1
-    real(kind_phys), dimension(kts:kte) :: zw1
-    real(kind_phys) :: cld_depth, z_agl0, z_agl, cldtau1, re_i, re_c, sum_cldtau
+    real(kind_phys) :: cld_depth, cldtau1, re_i, re_c, sum_cldtau
     logical :: check_fog_layer
     real(kind_phys), intent(out) :: cldceil1
     integer :: k
@@ -172,18 +179,12 @@ module module_bl_mynnedmf_diags
       re_c = 1.1e-5_kind_phys
     endif
 
-    zw1(kts)   = zero
-    z_agl      = zero
     sum_cldtau = zero
     check_fog_layer = .false.
     cldceil1   = -99._kind_phys ! default value for no cloud ceiling
     cld_depth  = zero
 
     do k = kts, kte-1
-      z_agl0 = z_agl
-      z_agl = zw1(k) + 0.5_kind_phys * dz1(k)  ! at mass point AGL
-      zw1(k+1) = zw1(k) + dz1(k)               ! at interface
-
       ! temperature-dependent ice cloud effective radius (Mishara et al. 2014)
       re_i = 173.46_kind_phys + 2.14_kind_phys * (tk1(k) - 273.15_kind_phys)
 
@@ -224,12 +225,12 @@ module module_bl_mynnedmf_diags
 
   end subroutine cloud_ceiling
 
-  function interpolate_wind(k_idx, kts, target_z, z_agl,                      &
+  function interpolate_wind(k_idx, kts, target_z, zagl,                      &
                             u1_curr,v1_curr, u1_prev, v1_prev, depth)         &
                               result(wspd1_hgt)
 
     integer, intent(in) :: k_idx, kts
-    real(kind_phys), intent(in)    :: target_z, z_agl, u1_curr, v1_curr,      &
+    real(kind_phys), intent(in)    :: target_z, zagl, u1_curr, v1_curr,      &
             u1_prev, v1_prev, depth
     real :: wspd1_hgt
 
@@ -240,7 +241,7 @@ module module_bl_mynnedmf_diags
     if (k_idx == kts) then
       wspd1_hgt = wspd1_curr
     else
-      wgt = (z_agl - target_z) /depth
+      wgt = (zagl - target_z) /depth
       wgt = min(max(zero, wgt), 1.0_kind_phys)
       wspd1_prev = sqrt(u1_prev**2 + v1_prev**2)
       wspd1_hgt = (1.0_kind_phys - wgt) * wspd1_curr + wgt * wspd1_prev

@@ -119,7 +119,7 @@ module module_bl_mynnedmf_tests
         integer, allocatable :: kpbl(:,:)
         real, allocatable :: pblh_loc(:,:)
         real, allocatable :: lwp(:,:), iwp(:,:), swp(:,:), wspd10(:,:), wspd80(:,:), wspd160(:,:),  &
-             cldceil(:,:)
+             cldceil(:,:), maxcldfra(:,:), maxcldfra_pbl(:,:)
         
         ! 3D arrays
         real, allocatable :: u_loc(:,:,:),v_loc(:,:,:), w_loc(:,:,:), th_loc(:,:,:), t3d_loc(:,:,:),& 
@@ -257,6 +257,8 @@ module module_bl_mynnedmf_tests
         allocate(wspd80(ims:ime, jms:jme))
         allocate(wspd160(ims:ime, jms:jme))
         allocate(cldceil(ims:ime, jms:jme))
+        allocate(maxcldfra(ims:ime, jms:jme))
+        allocate(maxcldfra_pbl(ims:ime, jms:jme))
 
         ! allocate 3D arrays
         allocate(qBUOY_loc(ims:ime, kms:kme, jms:jme))
@@ -546,6 +548,7 @@ module module_bl_mynnedmf_tests
                   maxmf_dd=maxmf_dd    , maxtkeprod=maxtkeprod, cldtop_cooling=cldtop_cooling, ent_eff=ent_eff,           &
                   lwp=lwp              , iwp=iwp              , swp=swp,                                                  &
                   wspd10=wspd10        , wspd80=wspd80        , wspd160=wspd160     , cldceil=cldceil,                    &
+                  maxcldfra=maxcldfra  , maxcldfra_pbl=maxcldfra_pbl ,                                                    &
                   qke=qke_loc              , qke_adv=qke_adv_loc     ,                                                    &
                   tsq=tsq_loc              , qsq=qsq_loc             , cov=cov_loc             ,                          &
                   el_pbl=el_pbl_loc        , rublten=rublten_loc     , rvblten=rvblten_loc     , rthblten=rthblten_loc  , &
@@ -572,14 +575,15 @@ module module_bl_mynnedmf_tests
                   mix_chem=mix_chem     , chem3d=chem3d         , vd3d=vd3d     , nchem=nchem           , &
                   ndvel=ndvel           ,                                                                 &
                   settle3d=settle3d     ,                                                                 &
-                  frp_mean=frp_mean    , emis_ant_no=emis_ant_no       , enh_mix=enh_mix               , &
+                  frp_mean=frp_mean    , emis_ant_no=emis_ant_no       , enh_mix=enh_mix                , &
 !#endif
                   errmsg=errmsg        , errflg=errflg                                                    &
                   )
              
-            if (case /= 'clr' .and. bl_mynn_diags >= 1) then
-                print '(A, I4, 3(A, F8.3))', 't =', t, ' | U = ', u_loc(1, 1, 1), ' | LWP = ',                &
-                        lwp(1, 1), ' | Ceiling = ', cldceil(1,1)
+            if (case /= 'clr' .and. bl_mynn_diags >= 2) then
+                print '(A, I4, 5(A, F8.3))', 't =', t, ' | U = ', u_loc(1, 1, 1), ' | LWP = ',            &
+                        lwp(1, 1), ' | Ceiling = ', cldceil(1,1), ' | Maxcldfra = ', maxcldfra(1,1),      &
+                        ' | Maxcldfra_pbl = ', maxcldfra_pbl(1,1)
             else
                 print '(A, I4, 1(A, F8.3))', 't =', t, ' | U = ', u_loc(1, 1, 1)
             endif

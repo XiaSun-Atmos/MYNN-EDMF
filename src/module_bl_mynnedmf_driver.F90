@@ -115,7 +115,8 @@
                   ent_eff           ,                                                               &
                   !optional 2d diagnostic output
                   lwp               , iwp               , swp                , wspd10             , &
-                  wspd80            , wspd160           , cldceil            ,                      &
+                  wspd80            , wspd160           , cldceil            , maxcldfra          , &
+                  maxcldfra_pbl     ,                                                               &
                   !optional 3d output
                   edmf_a            , edmf_w            ,                                           &
                   edmf_qt           , edmf_thl          , edmf_ent           , edmf_qc            , &
@@ -288,12 +289,14 @@
  real(kind_phys),intent(inout),dimension(ims:ime,jms:jme),optional:: &
     lwp,      &!
     iwp,      &!
-    swp
+    swp,      &!
+    cldceil
  real(kind_phys),intent(out),dimension(ims:ime,jms:jme),optional::   &
     wspd10,      &!
     wspd80,      &!
     wspd160,     &!
-    cldceil
+    maxcldfra,   &!
+    maxcldfra_pbl
 
 !--- output arguments:
  character(len=*),intent(out):: &
@@ -373,7 +376,8 @@
     pattern_spp1
 
  real(kind_phys):: &
-    pblh1, lwp1, iwp1, swp1, wspd101, wspd801, wspd1601, cldceil1
+    pblh1, lwp1, iwp1, swp1, wspd101, wspd801, wspd1601, cldceil1,      &
+    maxcldfra1 , maxcldfra_pbl1
 
  real(kind_phys),dimension(kts:kte):: &
     cldfra_bl1,qc_bl1,qi_bl1,el_pbl1,qke1,qke_adv1,cov1,qsq1,tsq1,sh1,sm1
@@ -891,14 +895,14 @@
 
     if (bl_mynn_diags >= 1) then
        call mynnedmf_diags (&
-               kts  = kts , kte    = kte    , p1         = p1        , dz1  =  dz1  , u1     = u1       ,&
+               kts  = kts , kte    = kte    , delp1      = delp1     , dz1  =  dz1  , u1     = u1       ,&
                v1   = v1  , tk1    = tk1    , qc1        = qc1       , qi1  =  qi1                      ,&
                qs1  = qs1 , qc_bl1 = qc_bl1 , qi_bl1     = qi_bl1    , cldfra_bl1 = cldfra_bl1          ,&        
-               rho1 = rho , xland1 = xland1 ,                                                            &
+               rho1 = rho , xland1 = xland1 , pblh1      = pblh1     ,                                   &
                ! diagnostic outputs
                lwp1     = lwp1   , iwp1    = iwp1   , swp1       = swp1      , cldceil1 = cldceil1      ,&
-               wspd101  = wspd101, wspd801 = wspd801, wspd1601   = wspd1601                             ,&
-               bl_mynn_diags = bl_mynn_diags )
+               wspd101  = wspd101, wspd801 = wspd801, wspd1601   = wspd1601  , maxcldfra1 = maxcldfra1  ,&
+               maxcldfra_pbl1 = maxcldfra_pbl1      , bl_mynn_diags = bl_mynn_diags )
 
        ! collect diagnostic output
        lwp(i,j)     = lwp1
@@ -910,6 +914,9 @@
           wspd10(i,j)  = wspd101
           wspd80(i,j)  = wspd801
           wspd160(i,j) = wspd1601
+
+          maxcldfra(i,j)     = maxcldfra1
+          maxcldfra_pbl(i,j) = maxcldfra_pbl1
        endif
 
     endif
