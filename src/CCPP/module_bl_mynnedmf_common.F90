@@ -139,13 +139,5 @@
  real(kind_phys),parameter:: p333    = 1.0/3.0
  real(kind_phys),parameter:: p4      = 0.4
  real(kind_phys),parameter:: p5      = 0.5
- real(kind_phys),parameter:: p6      = 0.6
- real(kind_phys),parameter:: p666    = 2.0/3.0
- real(kind_phys),parameter:: p7      = 0.7
- real(kind_phys),parameter:: p75     = 0.75
- real(kind_phys),parameter:: p8      = 0.8
- real(kind_phys),parameter:: p9      = 0.9
- real(kind_phys),parameter:: p95     = 0.95
- real(kind_phys),parameter:: p99     = 0.99 
 
  end module module_bl_mynnedmf_common
