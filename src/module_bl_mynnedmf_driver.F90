@@ -533,17 +533,17 @@
 
        if(f_qc .and. present(qc)) then
           do k = kts,kte
-             qc1(k) = qc(i,k,j)
+             qc1(k) = max(1e-10_kind_phys, qc(i,k,j))
           enddo
        endif
        if(f_qi .and. present(qi)) then
           do k = kts,kte
-             qi1(k) = qi(i,k,j)
+             qi1(k) = max(1e-10_kind_phys, qi(i,k,j))
           enddo
        endif
        if(f_qs .and. present(qs)) then
           do k = kts,kte
-             qs1(k) = qs(i,k,j)
+             qs1(k) = max(1e-10_kind_phys, qs(i,k,j))
           enddo
        endif
 
@@ -624,10 +624,10 @@
        rqnbcablten1(k) = zero
     enddo
     
-    if (neg_moist_check .and. present(qi) .and. present(qc)) then
+    if (neg_moist_check .and. present(sqi) .and. present(sqc)) then
        !find/fix negative mixing ratios
        call moisture_check2(kte        , delt       , delp1      , exner1     , &
-                            qv1        , qc1        , qi1        , th1          )
+                            sqv1       , sqc1       , sqi1        , th1        )
        do k = kts,kte
           tk1(k)    = th1(k)*exner1(k)
        enddo
@@ -635,11 +635,11 @@
     
     !--- conversion from mixing ratios to specific contents:
     if (dry_mixing_ratio) then
-       call mynnedmf_pre_run(kte,f_qc,f_qi,f_qs,qv1,qc1,qi1,qs1,sqv1,sqc1, &
+       call mynnedmf_qv_to_sqv(kte,f_qc,f_qi,f_qs,qv1,qc1,qi1,qs1,sqv1,sqc1, &
                             sqi1,sqs1,errmsg,errflg)
     else
-       call mynnedmf_sqv_to_qv(kte,f_qc,f_qi,f_qs,qv1,qc1,qi1,qs1,sqv1,    &
-                            sqc1,sqi1,sqs1,errmsg,errflg)
+       call mynnedmf_sqv_to_qv(kte,f_qc,f_qi,f_qs,qv1,qc1,qi1,qs1,sqv1,sqc1, &
+                            sqi1,sqs1,errmsg,errflg)
     endif
 
     !--- initialization of the stochastic forcing in the PBL:
@@ -728,6 +728,8 @@
             znt             = znt1          , u1          = u1            , v1          = v1           , &
             w1              = w1            , th1         = th1           , sqv1        = sqv1         , &
             sqc1            = sqc1          , sqi1        = sqi1          , sqs1        = sqs1         , &
+            qv1             = qv1           , qc1         = qc1           , qi1         = qi1          , &
+            qs1             = qs1           ,                                                            &
             qnc1            = qnc1          , qni1        = qni1          , qnwfa1      = qnwfa1       , &
             qnifa1          = qnifa1        , qnbca1      = qnbca1        , ozone1      = qoz1         , &
             delp1           = delp1         , zw1         = zw1           , zagl1       = zagl1        , &
@@ -1115,10 +1117,10 @@
  end subroutine mynnedmf_pre_finalize
 
 !=================================================================================================================
-!>\section arg_table_mynnedmf_pre_run
-!!\html\include mynnedmf_pre_run.html
+!>\section arg_table_mynnedmf_qv_to_sqv
+!!\html\include mynnedmf_qv_to_sqv.html
 !!
- subroutine mynnedmf_pre_run(kte,f_qc,f_qi,f_qs,qv,qc,qi,qs,sqv,sqc,sqi,sqs,errmsg,errflg)
+ subroutine mynnedmf_qv_to_sqv(kte,f_qc,f_qi,f_qs,qv,qc,qi,qs,sqv,sqc,sqi,sqs,errmsg,errflg)
 !=================================================================================================================
  use module_bl_mynnedmf_common,only: kind_phys,zero,one
    
@@ -1160,6 +1162,7 @@
  do k = kts,kte
     sqc(k) = zero
     sqi(k) = zero
+    sqs(k) = zero
  enddo
 
 !--- conversion from water vapor mixing ratio to specific humidity:
@@ -1188,7 +1191,7 @@
  errflg = 0
  errmsg = " "
 
- end subroutine mynnedmf_pre_run
+ end subroutine mynnedmf_qv_to_sqv
 !=================================================================================================================
 
 !=================================================================================================================
