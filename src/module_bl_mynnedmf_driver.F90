@@ -210,12 +210,10 @@
  real(kind_phys),intent(in),dimension(ims:ime,kms:kme,jms:jme):: &
     dz,          &!
     u,           &!
-    !w,           &!
     v,           &!
     th,          &!
     tk,          &!
     p,           &!
-    ! pint,        &!
     exner,       &!
     rho,         &!
     rthraten      !
