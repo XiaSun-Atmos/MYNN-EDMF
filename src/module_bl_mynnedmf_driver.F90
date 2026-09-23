@@ -210,16 +210,14 @@
  real(kind_phys),intent(in),dimension(ims:ime,kms:kme,jms:jme):: &
     dz,          &!
     u,           &!
-    w,           &!
     v,           &!
     th,          &!
     tk,          &!
     p,           &!
-    pint,        &!
     exner,       &!
     rho,         &!
     rthraten      !
-
+ real(kind_phys),intent(in),dimension(:,:,:):: pint, w
  real(kind_phys),intent(in),dimension(ims:ime,kms:kme,jms:jme),optional:: &
     qv,          &!
     qc,          &!
@@ -371,10 +369,7 @@
  real(kind_phys),dimension(kts:kte):: &
     dz1,u1,v1,th1,tk1,p1,exner1,rho1,qv1,rthraten1,delp1,zagl1
 
- real(kind_phys),dimension(kts:kte+1):: zw1
-
- real(kind_phys),dimension(kts:kme):: &
-    w1
+ real(kind_phys),dimension(kts:kte+1):: zw1, w1
 
  real(kind_phys),dimension(kts:kte):: &
     qc1,qi1,qs1,qnc1,qni1,qnifa1,qnwfa1,qnbca1,qoz1
